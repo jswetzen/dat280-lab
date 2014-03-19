@@ -1,6 +1,18 @@
-module LabA where
+module Main where
 
 import Control.Parallel
+import Criterion.Main
+import System.Random
+
+main :: IO ()
+main = defaultMain
+  [bench "sscanl1" (nf (sscanl1 (+)) randomInts),
+   bench "ppscanl1" (nf (ppscanl1 (+)) randomInts)]
+
+randomInts :: [Integer]
+randomInts =
+  take 200000 (randoms (mkStdGen 13402149018394))
+    :: [Integer]
 
 -- This is the original code from Mary
 type Fan a = [a] -> [a]
