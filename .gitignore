@@ -5,3 +5,4 @@
 # Haskell
 *.o
 *.hi
+*.exe
