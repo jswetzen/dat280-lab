@@ -6,3 +6,6 @@
 *.o
 *.hi
 *.exe
+
+# Windows
+*.bat
