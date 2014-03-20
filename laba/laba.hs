@@ -6,11 +6,11 @@ import System.Random (randoms, mkStdGen)
 import Control.Monad.Par
 
 main :: IO ()
-main = print $ runPar $ pfib 36
--- main = print $ dcscanl1 slowOp $ take 500 $ repeat (2000::Int)
--- main = print $ scanl1 slowOp $ take 500 $ repeat (1000::Int)
--- main = print $ ppscanl1 slowOp $ take 500 $ repeat (1000::Int)
--- main = print $ sscanl1 slowOp $ take 500 $ repeat (1000::Int)
+main = print $ runPar $ pmscanl1 slowOp $ replicate 1000 (1000::Int)
+-- main = print $ dcscanl1 slowOp $ replicate 1000 (100::Int)
+-- main = print $ scanl1 slowOp $ replicate 1000 (100::Int)
+-- main = print $ ppscanl1 slowOp $ replicate 1000 (100::Int)
+-- main = print $ sscanl1 slowOp $ replicate 1000 (100::Int)
 {-
 main = defaultMain
   [bench "scanl1" (nf (scanl1 slowOp) randomInts),
@@ -19,20 +19,6 @@ main = defaultMain
    bench "ppscanl1" (nf (ppscanl1 slowOp) randomInts),
    bench "dcscanl1" (nf (dcscanl1 slowOp) randomInts)]
  -}
-
-pfib :: Int -> Par Int
-pfib n | n <= 2    = return 1
-       | otherwise = do
-          x <- spawn $ pfib (n-1)
-          y <- spawn $ pfib (n-2)
-          x' <- get x
-          y' <- get y
-          return (x' + y')
-
-randomInts :: [Int]
-randomInts =
-  take 200 (randoms (mkStdGen 13402149018394))
-    :: [Int]
 
 -- This is the original code from Mary
 type Fan a = [a] -> [a]
@@ -53,6 +39,9 @@ skl f as = init los ++ ros'
 
 cnd2 :: Integral a => a -> a
 cnd2 n = n - n `div` 2 -- Ceiling of n/2
+
+cnd23 :: Integral a => a -> a
+cnd23 n = n - n `div` 3 -- Ceiling of n/2
 
 --- Start of our own copy with modifications
 
@@ -96,16 +85,31 @@ ppscanl1' n f as = par ros (pseq los (init los ++ ros'))
 
 dcscanl1 :: (NFData a) => (a -> a -> a) -> [a] -> [a]
 dcscanl1 f xs = divConq
-                  (\(i,_) -> i>=0)
+                  (\(i,_) -> i<=0)
                   half
                   combine
                   solve
-                  (2,xs)
+                  (5,xs)
   where
     half (i,as) = toList i $ splitAt (cnd2 (length as)) as
     toList i (las,ras) = [(i-1,las),(i-1,ras)]
     combine (los:ros:_) = init los ++ (mkFan f) (last los : ros)
-    solve (_, as) = ppscanl1 f as
+    solve (_, as) = fscanl1 f as
+
+pmscanl1 :: NFData a => (a -> a -> a) -> [a] -> Par [a]
+pmscanl1 _ [a] = return [a]
+pmscanl1 f as = do
+  let (las,ras) = splitAt (cnd2 (length as)) as
+  los <- spawn $ pmscanl1 f las
+  ros <- spawn $ pmscanl1 f ras
+  los' <- get los
+  ros' <- get ros
+  return (init los' ++ (mkFan f) (last los' : ros'))
+
+randomInts :: [Int]
+randomInts =
+  take 200 (randoms (mkStdGen 13402149018394))
+    :: [Int]
 
 divConq :: NFData sol
   => (prob -> Bool) -- indivisible?
