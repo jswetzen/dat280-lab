@@ -4,21 +4,34 @@ import Control.Parallel
 import Criterion.Main
 import System.Random (randoms, mkStdGen)
 import Control.Monad.Par
+import Control.Parallel.Strategies
 
 main :: IO ()
-main = print $ runPar $ pmscanl1 slowOp $ replicate 1000 (1000::Int)
--- main = print $ dcscanl1 slowOp $ replicate 1000 (100::Int)
--- main = print $ scanl1 slowOp $ replicate 1000 (100::Int)
--- main = print $ ppscanl1 slowOp $ replicate 1000 (100::Int)
--- main = print $ sscanl1 slowOp $ replicate 1000 (100::Int)
+main = print $ plscanl1 slowOp $ manyInts
+-- main = print $ chscanl1 slowOp $ manyInts
+-- main = print $ runPar $ pmscanl1 slowOp $ manyInts
+-- main = print $ dcscanl1 slowOp $ manyInts
+-- main = print $ scanl1 slowOp $ manyInts
+-- main = print $ ppscanl1 slowOp $ manyInts
+-- main = print $ sscanl1 slowOp $ manyInts
+
 {-
 main = defaultMain
-  [bench "scanl1" (nf (scanl1 slowOp) randomInts),
-   bench "fscanl1" (nf (fscanl1 slowOp) randomInts),
-   bench "sscanl1" (nf (sscanl1 slowOp) randomInts),
-   bench "ppscanl1" (nf (ppscanl1 slowOp) randomInts),
-   bench "dcscanl1" (nf (dcscanl1 slowOp) randomInts)]
- -}
+  [bench "scanl1" (nf (scanl1 slowOp) aBitFewerInts),
+   bench "fscanl1" (nf (fscanl1 slowOp) aBitFewerInts),
+   bench "sscanl1" (nf (sscanl1 slowOp) aBitFewerInts),
+   bench "ppscanl1" (nf (ppscanl1 slowOp) aBitFewerInts),
+   bench "dcscanl1" (nf (dcscanl1 slowOp) aBitFewerInts),
+   bench "pmscanl1" (nf (runPar.(pmscanl1 slowOp)) aBitFewerInts),
+   bench "chscanl1" (nf (chscanl1 slowOp) aBitFewerInts),
+   bench "plscanl1" (nf (plscanl1 slowOp) aBitFewerInts)]
+-- -}
+
+manyInts :: [Int]
+manyInts = replicate 1000 100
+
+aBitFewerInts :: [Int]
+aBitFewerInts = replicate 100 100
 
 -- This is the original code from Mary
 type Fan a = [a] -> [a]
@@ -125,3 +138,9 @@ divConq indiv split join f prob
       | otherwise = do
         sols <- parMapM go (split prob)
         return (join sols)
+
+chscanl1 :: NFData a => (a -> a -> a) -> [a] -> [a]
+chscanl1 f xs = sscanl1 f xs `using` parListChunk 20 rdeepseq
+
+plscanl1 :: NFData a => (a -> a -> a) -> [a] -> [a]
+plscanl1 f xs = sscanl1 f xs `using` parList rdeepseq
