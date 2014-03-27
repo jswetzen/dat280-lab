@@ -18,7 +18,10 @@ import Data.Random.Normal (normals')
 --import Control.Parallel.Strategies
 
 main :: IO ()
-main = print $ plscanl1 slowOp $ manyInts
+main = do sample <- generate2DSamplesList 100000 mX mY sdX sdY
+          print $ pfft 5 sample
+          --print $ fft sample
+-- main = print $ plscanl1 slowOp $ manyInts
 -- main = print $ chscanl1 slowOp $ manyInts
 -- main = print $ runPar $ pmscanl1 slowOp $ manyInts
 -- main = print $ dcscanl1 slowOp $ manyInts
@@ -156,7 +159,7 @@ chscanl1 f xs = sscanl1 f xs `using` parListChunk 20 rdeepseq
 plscanl1 :: NFData a => (a -> a -> a) -> [a] -> [a]
 plscanl1 f xs = sscanl1 f xs `using` parList rdeepseq
 
----------------------------------------Given.hs---------------------------------
+--------------------------------Given.hs----------------------------------------
 
 -- file given.hs for use with Lab 1 Part 1 of the Chalmers PFP Course
 -- Please write your names in the file if submitting it
@@ -189,7 +192,6 @@ divConq :: (prob -> Bool)              -- is the problem indivisible?
             -> ([sol] -> sol)          -- join
             -> (prob -> sol)           -- solve a sub-problem
             -> (prob -> sol)
-
 divConq indiv split join f prob = undefined
 
 
@@ -208,6 +210,23 @@ dft xs = [ sum [ xs!!j * tw n (j*k) | j <- [0..n']] | k <- [0..n']]
     n' = n-1
 
 
+pfft :: Int -> [Complex Float] -> [Complex Float]
+pfft _ [a] = [a]
+pfft 0 as = fft as
+pfft n as = runEval $ do 
+    (cs,ds) <- pbflyS as
+    ls <- rpar $ pfft (n-1) cs
+    rs <- rseq $ pfft (n-1) ds
+    rseq ls
+    return $ interleave ls rs
+
+pbflyS :: [Complex Float] -> Eval ([Complex Float], [Complex Float])
+pbflyS as = do
+    let (ls,rs) = halve as
+    los <- rpar $ zipWith (+) ls rs
+    ros <- rseq $ zipWith (-) ls rs
+    rts <- rseq $ zipWith (*) ros [tw (length as) i | i <- [0..(length ros) - 1]]
+    return (los,rts)
 
 -- In case you are wondering, this is the Decimation in Frequency (DIF) 
 -- radix 2 Cooley-Tukey FFT
@@ -220,6 +239,7 @@ fft as = interleave ls rs
     ls = fft cs
     rs = fft ds
 
+interleave :: [a] -> [a] -> [a]
 interleave [] bs = bs
 interleave (a:as) bs = a : interleave bs as
 
@@ -233,6 +253,7 @@ bflyS as = (los,rts)
 
 
 -- missing from original file
+halve :: [a] -> ([a],[a])
 halve as = splitAt n' as
   where
     n' = div (length as + 1) 2
