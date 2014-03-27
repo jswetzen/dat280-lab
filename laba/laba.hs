@@ -210,6 +210,8 @@ dft xs = [ sum [ xs!!j * tw n (j*k) | j <- [0..n']] | k <- [0..n']]
     n' = n-1
 
 
+-- Parallel version
+-- Sebbes
 pfft :: Int -> [Complex Float] -> [Complex Float]
 pfft _ [a] = [a]
 pfft 0 as = fft as
@@ -227,6 +229,27 @@ pbflyS as = do
     ros <- rseq $ zipWith (-) ls rs
     rts <- rseq $ zipWith (*) ros [tw (length as) i | i <- [0..(length ros) - 1]]
     return (los,rts)
+
+
+-- Johans
+--pfft :: Int -> [Complex Float] -> [Complex Float]
+--pfft _ [a] = [a]
+--pfft 0 as = fft as
+--pfft n as = runEval $ do
+--  (cs,ds) <- pbflyS as
+--  ls <- rpar $ pfft (n-1) cs
+--  rs <- rpar $ pfft (n-1) ds
+--  return $ interleave ls rs
+--
+--pbflyS :: [Complex Float] -> Eval ([Complex Float], [Complex Float])
+--pbflyS as = do
+--  (ls,rs) <- rpar $ halve as
+--  los <- rpar $ zipWith (+) ls rs
+--  ros <- rpar $ zipWith (-) ls rs
+--  rts <- rpar $ zipWith (*) ros [tw (length as) i | i <- [0..(length ros) - 1]]
+--  return (los,rts)
+
+-- End parallel version
 
 -- In case you are wondering, this is the Decimation in Frequency (DIF) 
 -- radix 2 Cooley-Tukey FFT
