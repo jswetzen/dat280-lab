@@ -7,5 +7,10 @@
 *.hi
 *.exe
 
+# Cabal
+.cabal-sandbox
+*cabal.sandbox.config
+*dist/
+
 # Windows
 *.bat
