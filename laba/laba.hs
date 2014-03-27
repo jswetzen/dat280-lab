@@ -18,7 +18,13 @@ import Data.Random.Normal (normals')
 --import Control.Parallel.Strategies
 
 main :: IO ()
-main = print $ plscanl1 slowOp $ manyInts
+main = do
+  samples <- generate2DSamplesList 100000 mX mY sdX sdY
+  let fout = fft samples
+  let pout = pfft 20 samples
+  -- print fout
+  print pout
+-- main = print $ plscanl1 slowOp $ manyInts
 -- main = print $ chscanl1 slowOp $ manyInts
 -- main = print $ runPar $ pmscanl1 slowOp $ manyInts
 -- main = print $ dcscanl1 slowOp $ manyInts
@@ -219,6 +225,28 @@ fft as = interleave ls rs
     (cs,ds) = bflyS as
     ls = fft cs
     rs = fft ds
+
+-- Parallel version
+
+
+pfft :: Int -> [Complex Float] -> [Complex Float]
+pfft _ [a] = [a]
+pfft 0 as = fft as
+pfft n as = runEval $ do
+  (cs,ds) <- pbflyS as
+  ls <- rpar $ pfft (n-1) cs
+  rs <- rpar $ pfft (n-1) ds
+  return $ interleave ls rs
+
+pbflyS :: [Complex Float] -> Eval ([Complex Float], [Complex Float])
+pbflyS as = do
+  (ls,rs) <- rpar $ halve as
+  los <- rpar $ zipWith (+) ls rs
+  ros <- rpar $ zipWith (-) ls rs
+  rts <- rpar $ zipWith (*) ros [tw (length as) i | i <- [0..(length ros) - 1]]
+  return (los,rts)
+
+-- End parallel version
 
 interleave [] bs = bs
 interleave (a:as) bs = a : interleave bs as
