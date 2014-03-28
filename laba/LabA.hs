@@ -15,8 +15,8 @@ import System.Random
 import Data.Random.Normal (normals')
 
 main :: IO ()
-main = do sample <- generate2DSamplesList 100000 mX mY sdX sdY
-          print $ pfft 5 sample
+-- main = do sample <- generate2DSamplesList 100000 mX mY sdX sdY
+--           print $ pfft 5 sample
           --print $ fft sample
 -- main = print $ plscanl1 slowOp $ manyInts
 -- main = print $ chscanl1 slowOp $ manyInts
@@ -26,7 +26,7 @@ main = do sample <- generate2DSamplesList 100000 mX mY sdX sdY
 -- main = print $ ppscanl1 slowOp $ manyInts
 -- main = print $ sscanl1 slowOp $ manyInts
 
-{-
+-- {-
 main = defaultMain
   [bench "scanl1" (nf (scanl1 slowOp) aBitFewerInts),
    bench "fscanl1" (nf (fscanl1 slowOp) aBitFewerInts),
@@ -132,7 +132,8 @@ pmscanl1 f as = do
   ros <- spawn $ pmscanl1 f ras
   los' <- get los
   ros' <- get ros
-  return (init los' ++ (mkFan f) (last los' : ros'))
+  fros <- (pmmkFan f (last los' : ros'))
+  return (init los' ++ fros)
 
 randomInts :: [Int]
 randomInts =
@@ -230,6 +231,11 @@ pbflyS as = do
     ros <- rseq $ zipWith (-) ls rs
     rts <- rseq $ zipWith (*) ros [tw (length as) i | i <- [0..(length ros) - 1]]
     return (los,rts)
+    -- --rts = zipWith (*) ros $ parMap f [0..(length ros)-1]
+    --   where
+    --     f :: Int -> Complex Float
+    --     f = tw (length as)
+
 
 
 -- Johans
@@ -274,11 +280,6 @@ bflyS as = (los,rts)
     los = zipWith (+) ls rs
     ros = zipWith (-) ls rs
     rts = zipWith (*) ros [tw (length as) i | i <- [0..(length ros) - 1]]
-    --rts = zipWith (*) ros $ parMap f [0..(length ros)-1]
-      where
-        f :: Int -> Complex Float
-        f = tw (length as)
-
 
 -- missing from original file
 halve :: [a] -> ([a],[a])

@@ -36,15 +36,9 @@ executable laba
   -- other-extensions:    
   build-depends:       base >=4.6 && <4.7
                        , normaldistribution
-<<<<<<< HEAD
                        , criterion
                        , monad-par
                        , random
-=======
-                       , random
-                       , criterion
-                       , monad-par
->>>>>>> 8baa19a7003773992d36fd683423b73a7d1bf676
                        , array
                        , parallel
   -- hs-source-dirs:      
