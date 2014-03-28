@@ -5,6 +5,7 @@ import Criterion.Main
 import System.Random (randoms, mkStdGen)
 import Control.Monad.Par
 import Control.Parallel.Strategies hiding (parMap)
+import Control.Monad
 
 --------------Given.hs------------
 import Data.Complex
@@ -47,8 +48,11 @@ aBitFewerInts = replicate 100 100
 type Fan a = [a] -> [a]
 
 mkFan :: (a -> a -> a) -> Fan a
---mkFan op (i:is) = i:[op i k | k <- is]
-mkFan op (i:is) = i:map (op i) is
+mkFan op (i:is) = i:[op i k | k <- is]
+
+pmmkFan :: NFData a => (a -> a -> a) -> [a] -> Par [a]
+--pmmkFan op = return (\(i:is) -> i:parMap (op i) is)
+pmmkFan op (i:is) = do liftM (i:) $ parMap (op i) is
 
 pplus :: Fan Int
 pplus = mkFan (+)
