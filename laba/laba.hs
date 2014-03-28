@@ -4,7 +4,7 @@ import Control.Parallel
 import Criterion.Main
 import System.Random (randoms, mkStdGen)
 import Control.Monad.Par
-import Control.Parallel.Strategies
+import Control.Parallel.Strategies hiding (parMap)
 
 --------------Given.hs------------
 import Data.Complex
@@ -12,10 +12,6 @@ import Data.Array
 import Data.Bits
 import System.Random
 import Data.Random.Normal (normals')
---import Criterion.Main
---import Control.Parallel
---import Control.Monad.Par  
---import Control.Parallel.Strategies
 
 main :: IO ()
 main = do sample <- generate2DSamplesList 100000 mX mY sdX sdY
@@ -51,7 +47,8 @@ aBitFewerInts = replicate 100 100
 type Fan a = [a] -> [a]
 
 mkFan :: (a -> a -> a) -> Fan a
-mkFan op (i:is) = i:[op i k | k <- is]
+--mkFan op (i:is) = i:[op i k | k <- is]
+mkFan op (i:is) = i:map (op i) is
 
 pplus :: Fan Int
 pplus = mkFan (+)
@@ -273,6 +270,10 @@ bflyS as = (los,rts)
     los = zipWith (+) ls rs
     ros = zipWith (-) ls rs
     rts = zipWith (*) ros [tw (length as) i | i <- [0..(length ros) - 1]]
+    --rts = zipWith (*) ros $ parMap f [0..(length ros)-1]
+      where
+        f :: Int -> Complex Float
+        f = tw (length as)
 
 
 -- missing from original file
