@@ -15,9 +15,10 @@ import System.Random
 import Data.Random.Normal (normals')
 
 main :: IO ()
--- main = do sample <- generate2DSamplesList 100000 mX mY sdX sdY
+main = do sample <- generate2DSamplesList 100000 mX mY sdX sdY
 --           print $ pfft 5 sample
-          --print $ fft sample
+--          print $ fft sample
+          print $ pfft2 5 sample
 -- main = print $ plscanl1 slowOp $ manyInts
 -- main = print $ chscanl1 slowOp $ manyInts
 -- main = print $ runPar $ pmscanl1 slowOp $ manyInts
@@ -26,7 +27,7 @@ main :: IO ()
 -- main = print $ ppscanl1 slowOp $ manyInts
 -- main = print $ sscanl1 slowOp $ manyInts
 
--- {-
+{-
 main = benchTask2
 
 
@@ -47,7 +48,7 @@ benchTask2 = do
   defaultMain
     [bench "fft" (nf fft samples),
      bench "pfft" (nf (runPar . (pfft 5)) samples)]
-
+-- -}
 
 manyInts :: [Int]
 manyInts = replicate 1000 100
@@ -224,7 +225,7 @@ dft xs = [ sum [ xs!!j * tw n (j*k) | j <- [0..n']] | k <- [0..n']]
 
 
 -- Parallel version
--- Sebbes
+-- Par Monad
 pfft :: Int -> [Complex Float] -> Par [Complex Float]
 pfft _ [a] = return [a]
 pfft 0 as = return $ fft as
@@ -236,6 +237,7 @@ pfft n as = do
     rs' <- get rs
     return $ interleave ls' rs'
 
+-- Par Monad
 pbflyS :: [Complex Float] -> Par ([Complex Float], [Complex Float])
 pbflyS as = do
     let (ls,rs) = halve as
@@ -245,30 +247,38 @@ pbflyS as = do
     fork $ put ros $ zipWith (-) ls rs
     los' <- get los
     ros' <- get ros
-    tws <- spawn $ parMap (\i -> tw (length as) i) [0..(length ls)]
+    tws <- spawn $ parMap (tw (length as)) [0..(length ls)]
     tws' <- get tws
     let rts = zipWith (*) ros' tws'
     return (los',rts)
 
+-- rpar & rseq
+pfft2 :: Int -> [Complex Float] -> [Complex Float]
+pfft2 _ [a] = [a]
+pfft2 0 as  = fft as
+pfft2 d as  = runEval $ do
+    let (cs,ds) = pbflyS2 as
+    ls <- rpar $ pfft2 (d-1) cs
+    rs <- rseq $ pfft2 (d-1) ds
+    rseq ls
+    return (interleave ls rs)
 
-
--- Johans
---pfft :: Int -> [Complex Float] -> [Complex Float]
---pfft _ [a] = [a]
---pfft 0 as = fft as
---pfft n as = runEval $ do
---  (cs,ds) <- pbflyS as
---  ls <- rpar $ pfft (n-1) cs
---  rs <- rpar $ pfft (n-1) ds
---  return $ interleave ls rs
---
---pbflyS :: [Complex Float] -> Eval ([Complex Float], [Complex Float])
---pbflyS as = do
---  (ls,rs) <- rpar $ halve as
---  los <- rpar $ zipWith (+) ls rs
---  ros <- rpar $ zipWith (-) ls rs
---  rts <- rpar $ zipWith (*) ros [tw (length as) i | i <- [0..(length ros) - 1]]
---  return (los,rts)
+-- rpar & rseq
+pbflyS2 :: [Complex Float] -> ([Complex Float], [Complex Float])
+pbflyS2 as = runEval $ do
+    let (ls,rs) = halve as
+    los <- rpar $ zipWith (+) ls rs
+    ros <- rseq $ zipWith (-) ls rs
+    let tws = runEval $ pMap (tw (length as)) [0..(length ros)-1]
+    rts <- rseq $ zipWith (*) ros tws
+    return (los,rts)
+      where
+        pMap :: (a -> b) -> [a] -> Eval [b]
+        pMap _ []     = return []
+        pMap f (b:bs) = do c <- rpar $ f b
+                           cs <- pMap f bs
+                           rseq c
+                           return (c:cs)
 
 -- End parallel version
 
