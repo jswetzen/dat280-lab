@@ -16,9 +16,10 @@ import Data.Random.Normal (normals')
 
 main :: IO ()
 main = do sample <- generate2DSamplesList 100000 mX mY sdX sdY
---           print $ pfft 5 sample
---          print $ fft sample
-          print $ pfft2 5 sample
+          -- print $ pfft 5 sample
+          -- print $ fft sample
+          print $ runPar $ parfft 5 sample
+          -- print $ sfft sample
 -- main = print $ plscanl1 slowOp $ manyInts
 -- main = print $ chscanl1 slowOp $ manyInts
 -- main = print $ runPar $ pmscanl1 slowOp $ manyInts
@@ -29,7 +30,6 @@ main = do sample <- generate2DSamplesList 100000 mX mY sdX sdY
 
 {-
 main = benchTask2
-
 
 benchTask1 :: IO ()
 benchTask1 = defaultMain
@@ -47,7 +47,8 @@ benchTask2 = do
   samples <- generate2DSamplesList 10000 mX mY sdX sdY
   defaultMain
     [bench "fft" (nf fft samples),
-     bench "pfft" (nf (runPar . (pfft 5)) samples)]
+     bench "pfft" (nf (pfft 5) samples),
+     bench "parfft" (nf (runPar . (parfft 5)) samples)]
 -- -}
 
 manyInts :: [Int]
@@ -201,12 +202,12 @@ generate2DSamplesList n mx my sdx sdy = do
 
 
 -- Task 1
-divConq :: (prob -> Bool)              -- is the problem indivisible?
+divConq :: NFData sol => (prob -> Bool)-- is the problem indivisible?
             -> (prob -> [prob])        -- split
             -> ([sol] -> sol)          -- join
             -> (prob -> sol)           -- solve a sub-problem
             -> (prob -> sol)
-divConq indiv split join f prob = undefined
+divConq = divConq'
 
 
 
@@ -223,23 +224,41 @@ dft xs = [ sum [ xs!!j * tw n (j*k) | j <- [0..n']] | k <- [0..n']]
     n = length xs
     n' = n-1
 
+-- Parallel version - par & pseq
 
--- Parallel version
--- Par Monad
-pfft :: Int -> [Complex Float] -> Par [Complex Float]
-pfft _ [a] = return [a]
-pfft 0 as = return $ fft as
-pfft n as = do
-    (cs,ds) <- pbflyS as
-    ls <- spawn $ pfft (n-1) cs
-    rs <- spawn $ pfft (n-1) ds
+pfft :: Int -> [Complex Float] -> [Complex Float]
+pfft _ [a] = [a]
+pfft 0 as = fft as
+pfft n as = ls `par` rs `pseq` interleave ls rs
+  where
+    (cs,ds) = pbflyS as
+    ls = pfft (n-1) cs
+    rs = pfft (n-1) ds
+
+pbflyS :: [Complex Float] -> ([Complex Float], [Complex Float])
+pbflyS as = tws `par` (los,rts)
+  where
+    (ls,rs) = halve as
+    los = zipWith (+) ls rs
+    ros = zipWith (-) ls rs
+    tws = [tw (length as) i | i <- [0..(length ls)]]
+    rts = zipWith (*) ros tws
+
+-- Parallel version - Par Monad
+
+parfft :: Int -> [Complex Float] -> Par [Complex Float]
+parfft _ [a] = return [a]
+parfft 0 as = return $ fft as
+parfft n as = do
+    (cs,ds) <- parbflyS as
+    ls <- spawn $ parfft (n-1) cs
+    rs <- spawn $ parfft (n-1) ds
     ls' <- get ls
     rs' <- get rs
     return $ interleave ls' rs'
 
--- Par Monad
-pbflyS :: [Complex Float] -> Par ([Complex Float], [Complex Float])
-pbflyS as = do
+parbflyS :: [Complex Float] -> Par ([Complex Float], [Complex Float])
+parbflyS as = do
     let (ls,rs) = halve as
     los <- new
     ros <- new
@@ -251,6 +270,22 @@ pbflyS as = do
     tws' <- get tws
     let rts = zipWith (*) ros' tws'
     return (los',rts)
+
+-- Strategies
+
+sfft :: [Complex Float] -> [Complex Float]
+sfft [a] = [a]
+sfft as = divConq
+            (\(i,_) -> i<=0)
+            half
+            combine
+            solve
+            (5,as)
+  where
+    half (i,bs) = withCounter (i-1) $ bflyS bs
+    withCounter i (l,r) = [(i,l),(i,r)]
+    combine (ls:rs:_) = interleave ls rs
+    solve (_,cs) = fft cs
 
 -- rpar & rseq
 pfft2 :: Int -> [Complex Float] -> [Complex Float]
@@ -269,7 +304,7 @@ pbflyS2 as = runEval $ do
     let (ls,rs) = halve as
     los <- rpar $ zipWith (+) ls rs
     ros <- rseq $ zipWith (-) ls rs
-    let tws = runEval $ pMap (tw (length as)) [0..(length ros)-1]
+    tws <- pMap (tw (length as)) [0..(length ros)-1]
     rts <- rseq $ zipWith (*) ros tws
     return (los,rts)
       where
