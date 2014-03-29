@@ -15,11 +15,15 @@ import System.Random
 import Data.Random.Normal (normals')
 
 main :: IO ()
-main = do sample <- generate2DSamplesList 100000 mX mY sdX sdY
-          -- print $ pfft 5 sample
-          -- print $ fft sample
-          print $ runPar $ parfft 5 sample
-          -- print $ sfft sample
+-- main = do sample <- generate2DSamplesList 100000 mX mY sdX sdY
+--           -- print $ pfft 5 sample
+--           -- print $ fft sample
+--           print $ runPar $ parfft 5 sample
+--           -- print $ sfft sample
+--        -- Testing if they give the same result
+          -- let fsol = fft sample
+          -- let ssol = sfft sample
+          -- print $ fsol == ssol
 -- main = print $ plscanl1 slowOp $ manyInts
 -- main = print $ chscanl1 slowOp $ manyInts
 -- main = print $ runPar $ pmscanl1 slowOp $ manyInts
@@ -28,7 +32,7 @@ main = do sample <- generate2DSamplesList 100000 mX mY sdX sdY
 -- main = print $ ppscanl1 slowOp $ manyInts
 -- main = print $ sscanl1 slowOp $ manyInts
 
-{-
+-- {-
 main = benchTask2
 
 benchTask1 :: IO ()
@@ -48,6 +52,8 @@ benchTask2 = do
   defaultMain
     [bench "fft" (nf fft samples),
      bench "pfft" (nf (pfft 5) samples),
+     bench "pfft2" (nf (pfft2 5) samples),
+     bench "sfft" (nf (sfft) samples),
      bench "parfft" (nf (runPar . (parfft 5)) samples)]
 -- -}
 
