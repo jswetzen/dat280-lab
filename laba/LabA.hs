@@ -27,7 +27,11 @@ main :: IO ()
 -- main = print $ sscanl1 slowOp $ manyInts
 
 -- {-
-main = defaultMain
+main = benchTask2
+
+
+benchTask1 :: IO ()
+benchTask1 = defaultMain
   [bench "scanl1" (nf (scanl1 slowOp) aBitFewerInts),
    bench "fscanl1" (nf (fscanl1 slowOp) aBitFewerInts),
    bench "sscanl1" (nf (sscanl1 slowOp) aBitFewerInts),
@@ -36,7 +40,14 @@ main = defaultMain
    bench "pmscanl1" (nf (runPar.(pmscanl1 slowOp)) aBitFewerInts),
    bench "chscanl1" (nf (chscanl1 slowOp) aBitFewerInts),
    bench "plscanl1" (nf (plscanl1 slowOp) aBitFewerInts)]
--- -}
+
+benchTask2 :: IO ()
+benchTask2 = do
+  samples <- generate2DSamplesList 10000 mX mY sdX sdY
+  defaultMain
+    [bench "fft" (nf fft samples),
+     bench "pfft" (nf (runPar . (pfft 5)) samples)]
+
 
 manyInts :: [Int]
 manyInts = replicate 1000 100
@@ -214,27 +225,30 @@ dft xs = [ sum [ xs!!j * tw n (j*k) | j <- [0..n']] | k <- [0..n']]
 
 -- Parallel version
 -- Sebbes
-pfft :: Int -> [Complex Float] -> [Complex Float]
-pfft _ [a] = [a]
-pfft 0 as = fft as
-pfft n as = runEval $ do 
+pfft :: Int -> [Complex Float] -> Par [Complex Float]
+pfft _ [a] = return [a]
+pfft 0 as = return $ fft as
+pfft n as = do
     (cs,ds) <- pbflyS as
-    ls <- rpar $ pfft (n-1) cs
-    rs <- rseq $ pfft (n-1) ds
-    rseq ls
-    return $ interleave ls rs
+    ls <- spawn $ pfft (n-1) cs
+    rs <- spawn $ pfft (n-1) ds
+    ls' <- get ls
+    rs' <- get rs
+    return $ interleave ls' rs'
 
-pbflyS :: [Complex Float] -> Eval ([Complex Float], [Complex Float])
+pbflyS :: [Complex Float] -> Par ([Complex Float], [Complex Float])
 pbflyS as = do
     let (ls,rs) = halve as
-    los <- rpar $ zipWith (+) ls rs
-    ros <- rseq $ zipWith (-) ls rs
-    rts <- rseq $ zipWith (*) ros [tw (length as) i | i <- [0..(length ros) - 1]]
-    return (los,rts)
-    -- --rts = zipWith (*) ros $ parMap f [0..(length ros)-1]
-    --   where
-    --     f :: Int -> Complex Float
-    --     f = tw (length as)
+    los <- new
+    ros <- new
+    fork $ put los $ zipWith (+) ls rs
+    fork $ put ros $ zipWith (-) ls rs
+    los' <- get los
+    ros' <- get ros
+    tws <- spawn $ parMap (\i -> tw (length as) i) [0..(length ls)]
+    tws' <- get tws
+    let rts = zipWith (*) ros' tws'
+    return (los',rts)
 
 
 
