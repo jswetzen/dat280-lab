@@ -50,11 +50,12 @@ benchTask2 :: IO ()
 benchTask2 = do
   samples <- generate2DSamplesList 10000 mX mY sdX sdY
   defaultMain
-    [bench "fft" (nf fft samples),
-     bench "pfft" (nf (pfft 5) samples),
-     bench "pfft2" (nf (pfft2 5) samples),
-     bench "sfft" (nf (sfft) samples),
-     bench "parfft" (nf (runPar . (parfft 5)) samples)]
+    [bench "fft" (nf fft samples), -- A base to test against
+     bench "pfft" (nf (pfft 5) samples), -- par & pseq, some speedup
+     bench "pfft2" (nf (pfft2 5) samples), -- rpar & resq, makes it worse
+     bench "sfft" (nf (sfft) samples),  -- Strategies (first try), really bad
+     bench "spfft" (nf (spfft) samples), -- divConq with Par, the best one yet
+     bench "parfft" (nf (runPar . (parfft 5)) samples)] -- Par monad, quite good
 -- -}
 
 manyInts :: [Int]
@@ -213,9 +214,34 @@ divConq :: NFData sol => (prob -> Bool)-- is the problem indivisible?
             -> ([sol] -> sol)          -- join
             -> (prob -> sol)           -- solve a sub-problem
             -> (prob -> sol)
-divConq = divConq'
+-- divConq = divConq'
+divConq ind s j sol = \inp ->
+  divConq'' sol inp ind jo sp
+    where
+      jo x y = j [x,y]
+      sp xs = Just $ tuplify $ s xs
+      tuplify (a:b:_) = (a,b)
 
-
+-- Shamelessly copied from lecture 4
+divConq'' ::  NFData b =>
+              (a -> b)                -- function on base cases
+               -> a                   -- input
+               -> (a -> Bool)         -- threshold reached?
+               -> (b -> b -> b)       -- combine
+               -> (a -> Maybe (a,a))  -- divide
+               -> b                   -- result
+divConq'' f arg threshold combine divide = go arg
+  where
+    go arg =
+      case divide arg of
+        Nothing -> f arg
+        Just (l0,r0) -> combine l1 r1 `using` strat
+          where
+            l1 = go l0
+            r1 = go r0
+            strat x = do r l1; r r1; return x
+                where r | threshold arg = rseq
+                        | otherwise = rpar
 
 -- Task 2
 
@@ -280,8 +306,23 @@ parbflyS as = do
 -- Strategies
 
 sfft :: [Complex Float] -> [Complex Float]
-sfft [a] = [a]
-sfft as = divConq
+sfft as = divConq''
+            solve
+            (5,as)
+            (\(i,_) -> i<=0)
+            combine
+            half
+  where
+    half (_,(b:[])) = Nothing
+    half (i,bs) = Just $ withCounter (i-1) $ bflyS bs
+    withCounter i (l,r) = ((i,l),(i,r))
+    combine ls rs = interleave ls rs
+    solve (_,[c]) = [c]
+
+-- Thought I did strategies first, but divConq uses Par
+spfft :: [Complex Float] -> [Complex Float]
+spfft [a] = [a]
+spfft as = divConq
             (\(i,_) -> i<=0)
             half
             combine
