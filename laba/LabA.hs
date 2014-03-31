@@ -307,7 +307,7 @@ pbflyS2 as = do
     let (l,(ls,rs)) = halve as
     los <- rpar $ zipWith (+) ls rs
     ros <- rpar $ zipWith (-) ls rs
-    let tws = ((`using` parListChunk 50 rdeepseq) . map (tw la)) [0..l-1]
+    let tws = ((`using` parListChunk 10 rdeepseq) . map (tw la)) [0..l-1]
     rseq ros
     rts <- rseq $ zipWith (*) ros tws
     rseq los
@@ -315,7 +315,7 @@ pbflyS2 as = do
       where
         la = length as
 
--- Thought I did strategies first, but divConq uses Par
+-- divConq from Simon Marlow's lecture, it uses Par
 spfft :: [Complex Float] -> [Complex Float]
 spfft [a] = [a]
 spfft as = divConq'
