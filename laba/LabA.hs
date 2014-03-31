@@ -21,7 +21,7 @@ main :: IO ()
 --           print $ fft sample
 --           print $ runPar $ parfft 5 sample
 --           print $ sfft sample
---           print $ pfft2 5 sample
+          -- print $ pfft2 5 sample
           -- Testing if they give the same result
           -- let fsol = fft sample
           -- let psol = pfft 5 sample
@@ -249,7 +249,7 @@ dft xs = [ sum [ xs!!j * tw n (j*k) | j <- [0..n']] | k <- [0..n']]
 pfft :: Int -> [Complex Float] -> [Complex Float]
 pfft _ [a] = [a]
 pfft 0 as = fft as
-pfft n as = (rnf ls) `par` (rnf rs) `pseq` interleave ls rs
+pfft n as = rnf ls `par` rnf rs `pseq` interleave ls rs
   where
     (cs,ds) = pbflyS as
     ls = pfft (n-1) cs
@@ -263,6 +263,61 @@ pbflyS as = tws `par` los `par` ros `seq` (los,rts)
     ros = zipWith (-) ls rs
     tws = map (tw (length as)) [0..l-1]
     rts = zipWith (*) ros tws
+
+-- Strategies
+
+sfft :: [Complex Float] -> [Complex Float]
+sfft as = divConq''
+            solve
+            (5,as)
+            (\(i,_) -> i<=0)
+            combine
+            half
+  where
+    half (_,(b:[])) = Nothing
+    half (i,bs) = Just $ withCounter (i-1) $ bflyS bs
+    withCounter i (l,r) = ((i,l),(i,r))
+    combine ls rs = interleave ls rs
+    solve (_,[c]) = [c]
+
+-- rpar & rseq
+pfft2 :: Int -> [Complex Float] -> [Complex Float]
+pfft2 _ [a] = [a]
+pfft2 0 as  = fft as
+pfft2 d as  = runEval $ do
+    (cs,ds) <- pbflyS2 as
+    ls <- rpar $ pfft2 (d-1) cs
+    rs <- rseq $ pfft2 (d-1) ds
+    rseq ls
+    return $ interleave ls rs
+
+pbflyS2 :: [Complex Float] -> Eval ([Complex Float], [Complex Float])
+pbflyS2 as = do
+    let (l,(ls,rs)) = halve as
+    los <- rpar $ zipWith (+) ls rs
+    ros <- rpar $ zipWith (-) ls rs
+    tws <- return $ ((`using` parListChunk 50 rdeepseq) . map (tw la)) [0..l-1]
+    rseq ros
+    rts <- rseq $ zipWith (*) ros tws
+    rseq los
+    return (los,rts)
+      where
+        la = length as
+
+-- Thought I did strategies first, but divConq uses Par
+spfft :: [Complex Float] -> [Complex Float]
+spfft [a] = [a]
+spfft as = divConq'
+            (\(i,_) -> i<=0)
+            half
+            combine
+            solve
+            (5,as)
+  where
+    half (i,bs) = withCounter (i-1) $ bflyS bs
+    withCounter i (l,r) = [(i,l),(i,r)]
+    combine (ls:rs:_) = interleave ls rs
+    solve (_,cs) = fft cs
 
 -- Parallel version - Par Monad
 
@@ -290,62 +345,6 @@ parbflyS as = do
     tws' <- get tws
     let rts = zipWith (*) ros' tws'
     return (los',rts)
-
--- Strategies
-
-sfft :: [Complex Float] -> [Complex Float]
-sfft as = divConq''
-            solve
-            (5,as)
-            (\(i,_) -> i<=0)
-            combine
-            half
-  where
-    half (_,(b:[])) = Nothing
-    half (i,bs) = Just $ withCounter (i-1) $ bflyS bs
-    withCounter i (l,r) = ((i,l),(i,r))
-    combine ls rs = interleave ls rs
-    solve (_,[c]) = [c]
-
--- Thought I did strategies first, but divConq uses Par
-spfft :: [Complex Float] -> [Complex Float]
-spfft [a] = [a]
-spfft as = divConq'
-            (\(i,_) -> i<=0)
-            half
-            combine
-            solve
-            (5,as)
-  where
-    half (i,bs) = withCounter (i-1) $ bflyS bs
-    withCounter i (l,r) = [(i,l),(i,r)]
-    combine (ls:rs:_) = interleave ls rs
-    solve (_,cs) = fft cs
-
--- rpar & rseq
-pfft2 :: Int -> [Complex Float] -> [Complex Float]
-pfft2 _ [a] = [a]
-pfft2 0 as  = fft as
-pfft2 d as  = runEval $ do
-    let (cs,ds) = pbflyS2 as
-    ls <- rpar $ pfft2 (d-1) cs
-    rs <- rseq $ pfft2 (d-1) ds
-    rseq ls
-    return $ interleave ls rs
-
--- rpar & rseq
-pbflyS2 :: [Complex Float] -> ([Complex Float], [Complex Float])
-pbflyS2 as = runEval $ do
-    let (l,(ls,rs)) = halve as
-    los <- rpar $ zipWith (+) ls rs
-    ros <- rpar $ zipWith (-) ls rs
-    tws <- return $ ((`using` parListChunk 50 rdeepseq) . map (tw la)) [0..l-1]
-    rseq ros
-    rts <- rseq $ zipWith (*) ros tws
-    rseq los
-    return (los,rts)
-      where
-        la = length as
 
 -- End parallel version
 
