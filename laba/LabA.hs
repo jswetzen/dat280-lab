@@ -28,7 +28,6 @@ main :: IO ()
           -- let p2sol = pfft2 5 sample
           -- print $ fsol == psol && fsol == p2sol
 -- main = print $ plscanl1 slowOp $ manyInts
--- main = print $ chscanl1 slowOp $ manyInts
 -- main = print $ runPar $ pmscanl1 slowOp $ manyInts
 -- main = print $ dcscanl1 slowOp $ manyInts
 -- main = print $ scanl1 slowOp $ manyInts
@@ -36,63 +35,46 @@ main :: IO ()
 -- main = print $ sscanl1 slowOp $ manyInts
 
 -- {-
-main = benchTask2
+main = benchTasks
 
-benchTask1 :: IO ()
-benchTask1 = defaultMain
-  [bench "scanl1" (nf (scanl1 slowOp) aBitFewerInts),
-   bench "fscanl1" (nf (fscanl1 slowOp) aBitFewerInts),
-   bench "sscanl1" (nf (sscanl1 slowOp) aBitFewerInts),
-   bench "ppscanl1" (nf (ppscanl1 slowOp) aBitFewerInts),
-   bench "dcscanl1" (nf (dcscanl1 slowOp) aBitFewerInts),
-   bench "pmscanl1" (nf (runPar.(pmscanl1 slowOp)) aBitFewerInts),
-   bench "chscanl1" (nf (chscanl1 slowOp) aBitFewerInts),
-   bench "plscanl1" (nf (plscanl1 slowOp) aBitFewerInts)]
-
-benchTask2 :: IO ()
-benchTask2 = do
-  samples <- generate2DSamplesList 10000 mX mY sdX sdY
-  let base_test1 = bgroup "Sequential" [bench "scanl1" (nf (scanl1 slowOp) aBitFewerInts)]
-      task1 = bgroup "Task 1" 
-       [bench "fscanl1" (nf (fscanl1 slowOp) aBitFewerInts),
-        bench "sscanl1" (nf (sscanl1 slowOp) aBitFewerInts),
-        bench "ppscanl1" (nf (ppscanl1 slowOp) aBitFewerInts),
-        bench "dcscanl1" (nf (dcscanl1 slowOp) aBitFewerInts),
-        bench "pmscanl1" (nf (runPar.(pmscanl1 slowOp)) aBitFewerInts),
-        bench "chscanl1" (nf (chscanl1 slowOp) aBitFewerInts),
-        bench "plscanl1" (nf (plscanl1 slowOp) aBitFewerInts)]
-      base_test = bgroup "Sequential" [bench "fft" (nf fft samples)] -- A base to test against
-      comparisons = bgroup "Parallel" $
-       [bench "pfft" (nf (pfft 5) samples), -- par & pseq, some speedup
-        bench "pfft2" (nf (pfft2 5) samples), -- rpar & resq, makes it worse
-        bench "sfft" (nf (sfft) samples),  -- Strategies (first try), really bad
-        bench "spfft" (nf (spfft) samples), -- divConq with Par, the best one yet
-        bench "parfft" (nf (runPar . (parfft 5)) samples)] -- Par monad, quite good
+benchTasks :: IO ()
+benchTasks = do
+  samples <- generate2DSamplesList 5000 mX mY sdX sdY
+  let task1_seq = bgroup "Sequential" [bench "Prelude's scanl1" (nf (scanl1 slowOp) aBitFewerInts), bench "Mary's recursive scanl1" (nf (sscanl1 slowOp) aBitFewerInts)]
+      task1_par = bgroup "Parallel"
+       [bench "par & pseq" (nf (ppscanl1 slowOp) aBitFewerInts),
+        bench "Divide & conquer" (nf (dcscanl1 slowOp) aBitFewerInts),
+        bench "Strategies, parList" (nf (plscanl1 slowOp) aBitFewerInts),
+        bench "Par Monad" (nf (runPar.(pmscanl1 slowOp)) aBitFewerInts)]
+      task1 = bgroup "Task 1" [task1_seq,task1_par]
+      task2_seq = bgroup "Sequential" [bench "Given fft" (nf fft samples)] -- A base to test against
+      task2_par = bgroup "Parallel" $
+       [bench "par & pseq" (nf (pfft 5) samples), -- par & pseq, some speedup
+        bench "rpar & rseq" (nf (pfft2 5) samples), -- rpar & resq, makes it worse
+        bench "Bad strategies try" (nf (sfft) samples),  -- Strategies (first try), really bad
+        bench "Simon Marlow's divConq with Par" (nf (spfft) samples), -- divConq with Par, the best one yet
+        bench "Par Monad" (nf (runPar . (parfft 5)) samples)] -- Par monad, quite good
+      task2 = bgroup "Task 2" [task2_seq,task2_par]
   defaultMain
-    [base_test1,
-     task1,
-     base_test, -- A base to test against
-     comparisons] -- The rest of the tests
+    [task1, task2] -- The rest of the tests
 -- -}
 
 manyInts :: [Int]
 manyInts = replicate 1000 100
 
 aBitFewerInts :: [Int]
-aBitFewerInts = replicate 100 100
+aBitFewerInts = replicate 220 100
 
 -- This is the original code from Mary
 type Fan a = [a] -> [a]
 
+-- Make a fanout
 mkFan :: (a -> a -> a) -> Fan a
 mkFan op (i:is) = i:[op i k | k <- is]
 
+-- Make a fanout, parallel version
 pmmkFan :: NFData a => (a -> a -> a) -> [a] -> Par [a]
---pmmkFan op = return (\(i:is) -> i:parMap (op i) is)
 pmmkFan op (i:is) = do liftM (i:) $ parMap (op i) is
-
-pplus :: Fan Int
-pplus = mkFan (+)
 
 skl :: Fan a -> [a] -> [a]
 skl _ [a] = [a]
@@ -105,9 +87,6 @@ skl f as = init los ++ ros'
 cnd2 :: Integral a => a -> a
 cnd2 n = n - n `div` 2 -- Ceiling of n/2
 
-cnd23 :: Integral a => a -> a
-cnd23 n = n - n `div` 3 -- Ceiling of n/2
-
 --- Start of our own copy with modifications
 
 -- Slow operator
@@ -115,14 +94,7 @@ slowOp :: Integral a => a -> a -> a
 slowOp a b | a <= 0    = b
            | otherwise = 1 + (slowOp (a-1) b)
 
--- Fast scanl1
-fscanl1 :: (a -> a -> a) -> [a] -> [a]
-fscanl1 _ []     = []
-fscanl1 _ [a]    = [a]
-fscanl1 f (a:b:as) = a : fscanl1 f (b':as)
-  where b' = f a b
-
--- The original code
+-- The code stolen from Mary's paper
 sscanl1 :: (a -> a -> a) -> [a] -> [a]
 sscanl1 _ [a] = [a]
 sscanl1 f as = init los ++ ros'
@@ -147,7 +119,7 @@ ppscanl1' n f as = par ros (pseq los (init los ++ ros'))
     ros' = ff (last los : ros)
     ff = mkFan f
 
-
+-- Divide and conquer with Simon Marlow's Par-based divConq
 dcscanl1 :: (NFData a) => (a -> a -> a) -> [a] -> [a]
 dcscanl1 f xs = divConq'
                   (\(i,_) -> i<=0)
@@ -159,8 +131,13 @@ dcscanl1 f xs = divConq'
     half (i,as) = toList i $ splitAt (cnd2 (length as)) as
     toList i (las,ras) = [(i-1,las),(i-1,ras)]
     combine (los:ros:_) = init los ++ (mkFan f) (last los : ros)
-    solve (_, as) = fscanl1 f as
+    solve (_, as) = scanl1 f as
 
+-- Strategies, with parList
+plscanl1 :: NFData a => (a -> a -> a) -> [a] -> [a]
+plscanl1 f xs = sscanl1 f xs `using` parList rdeepseq
+
+-- Pure Par implementation, with a parallel pmmkFan
 pmscanl1 :: NFData a => (a -> a -> a) -> [a] -> Par [a]
 pmscanl1 _ [a] = return [a]
 pmscanl1 f as = do
@@ -191,12 +168,6 @@ divConq' indiv split join f prob
       | otherwise = do
         sols <- parMapM go (split prob)
         return (join sols)
-
-chscanl1 :: NFData a => (a -> a -> a) -> [a] -> [a]
-chscanl1 f xs = sscanl1 f xs `using` parListChunk 20 rdeepseq
-
-plscanl1 :: NFData a => (a -> a -> a) -> [a] -> [a]
-plscanl1 f xs = sscanl1 f xs `using` parList rdeepseq
 
 --------------------------------Given.hs----------------------------------------
 
