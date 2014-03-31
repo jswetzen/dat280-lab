@@ -41,6 +41,7 @@ executable laba
                        , random
                        , array
                        , parallel
+                       , deepseq
   -- hs-source-dirs:      
   ghc-options:         -O2 -threaded -rtsopts -eventlog
   default-language:    Haskell2010

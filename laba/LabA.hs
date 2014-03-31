@@ -1,10 +1,11 @@
 module Main where
 
 import Control.Parallel
+import Control.DeepSeq
 import Criterion.Main
 import System.Random (randoms, mkStdGen)
-import Control.Monad.Par as P
-import Control.Parallel.Strategies as S
+import Control.Monad.Par
+import Control.Parallel.Strategies hiding (parMap)
 import Control.Monad
 
 --------------Given.hs------------
@@ -51,7 +52,16 @@ benchTask1 = defaultMain
 benchTask2 :: IO ()
 benchTask2 = do
   samples <- generate2DSamplesList 10000 mX mY sdX sdY
-  let base_test = bgroup "Sequential" [bench "fft" (nf fft samples)] -- A base to test against
+  let base_test1 = bgroup "Sequential" [bench "scanl1" (nf (scanl1 slowOp) aBitFewerInts)]
+      task1 = bgroup "Task 1" 
+       [bench "fscanl1" (nf (fscanl1 slowOp) aBitFewerInts),
+        bench "sscanl1" (nf (sscanl1 slowOp) aBitFewerInts),
+        bench "ppscanl1" (nf (ppscanl1 slowOp) aBitFewerInts),
+        bench "dcscanl1" (nf (dcscanl1 slowOp) aBitFewerInts),
+        bench "pmscanl1" (nf (runPar.(pmscanl1 slowOp)) aBitFewerInts),
+        bench "chscanl1" (nf (chscanl1 slowOp) aBitFewerInts),
+        bench "plscanl1" (nf (plscanl1 slowOp) aBitFewerInts)]
+      base_test = bgroup "Sequential" [bench "fft" (nf fft samples)] -- A base to test against
       comparisons = bgroup "Parallel" $
        [bench "pfft" (nf (pfft 5) samples), -- par & pseq, some speedup
         bench "pfft2" (nf (pfft2 5) samples), -- rpar & resq, makes it worse
@@ -59,7 +69,9 @@ benchTask2 = do
         bench "spfft" (nf (spfft) samples), -- divConq with Par, the best one yet
         bench "parfft" (nf (runPar . (parfft 5)) samples)] -- Par monad, quite good
   defaultMain
-    [base_test, -- A base to test against
+    [base_test1,
+     task1,
+     base_test, -- A base to test against
      comparisons] -- The rest of the tests
 -- -}
 
@@ -77,7 +89,7 @@ mkFan op (i:is) = i:[op i k | k <- is]
 
 pmmkFan :: NFData a => (a -> a -> a) -> [a] -> Par [a]
 --pmmkFan op = return (\(i:is) -> i:parMap (op i) is)
-pmmkFan op (i:is) = do liftM (i:) $ P.parMap (op i) is
+pmmkFan op (i:is) = do liftM (i:) $ parMap (op i) is
 
 pplus :: Fan Int
 pplus = mkFan (+)
@@ -266,7 +278,7 @@ dft xs = [ sum [ xs!!j * tw n (j*k) | j <- [0..n']] | k <- [0..n']]
 pfft :: Int -> [Complex Float] -> [Complex Float]
 pfft _ [a] = [a]
 pfft 0 as = fft as
-pfft n as = ls `par` rs `pseq` interleave ls rs
+pfft n as = (rnf ls) `par` (rnf rs) `pseq` interleave ls rs
   where
     (cs,ds) = pbflyS as
     ls = pfft (n-1) cs
@@ -301,7 +313,7 @@ parbflyS as = do
     ros <- new
     fork $ put los $ zipWith (+) ls rs
     fork $ put ros $ zipWith (-) ls rs
-    tws <- spawn $ P.parMap (tw (length as)) [0..l]
+    tws <- spawn $ parMap (tw (length as)) [0..l]
     los' <- get los
     ros' <- get ros
     tws' <- get tws
@@ -356,20 +368,13 @@ pbflyS2 as = runEval $ do
     let (l,(ls,rs)) = halve as
     los <- rpar $ zipWith (+) ls rs
     ros <- rpar $ zipWith (-) ls rs
-    tws <- pMap (l `div` 50) (tw la) [0..l-1]
-    --rseq ros
+    tws <- return $ ((`using` parListChunk 50 rdeepseq) . map (tw la)) [0..l-1]
+    rseq ros
     rts <- rseq $ zipWith (*) ros tws
-    --rseq los
+    rseq los
     return (los,rts)
       where
         la = length as
-        pMap :: Int -> (a -> b) -> [a] -> Eval [b]
-        pMap _ _ []     = return []
-        pMap c f bs | c < length bs = return $ map f bs
-                    | otherwise     = do d <- rpar $ map f $ take c bs
-                                         ds <- pMap c f $ drop c bs
-                                         --rseq d
-                                         return $ d ++ ds
 
 -- End parallel version
 
