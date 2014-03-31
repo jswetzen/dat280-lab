@@ -271,10 +271,10 @@ pfft n as = ls `par` rs `pseq` interleave ls rs
 pbflyS :: [Complex Float] -> ([Complex Float], [Complex Float])
 pbflyS as = tws `par` (los,rts)
   where
-    (ls,rs) = halve as
+    (l,(ls,rs)) = halve as
     los = zipWith (+) ls rs
     ros = zipWith (-) ls rs
-    tws = [tw (length as) i | i <- [0..(length ls)]]
+    tws = [tw (length as) i | i <- [0..l]]
     rts = zipWith (*) ros tws
 
 -- Parallel version - Par Monad
@@ -292,14 +292,14 @@ parfft n as = do
 
 parbflyS :: [Complex Float] -> Par ([Complex Float], [Complex Float])
 parbflyS as = do
-    let (ls,rs) = halve as
+    let (l,(ls,rs)) = halve as
     los <- new
     ros <- new
     fork $ put los $ zipWith (+) ls rs
     fork $ put ros $ zipWith (-) ls rs
     los' <- get los
     ros' <- get ros
-    tws <- spawn $ P.parMap (tw (length as)) [0..(length ls)]
+    tws <- spawn $ P.parMap (tw (length as)) [0..l]
     tws' <- get tws
     let rts = zipWith (*) ros' tws'
     return (los',rts)
@@ -349,10 +349,10 @@ pfft2 d as  = runEval $ do
 -- rpar & rseq
 pbflyS2 :: [Complex Float] -> ([Complex Float], [Complex Float])
 pbflyS2 as = runEval $ do
-    let (ls,rs) = halve as
+    let (l,(ls,rs)) = halve as
     los <- rpar $ zipWith (+) ls rs
     ros <- rseq $ zipWith (-) ls rs
-    tws <- pMap 50 (tw (length as)) [0..(length ros)-1]
+    tws <- pMap 50 (tw (length as)) [0..l-1]
 --    tws <- return $ S.parMap rseq (tw (length as)) [0..(length ros)-1]
     rts <- rpar $ zipWith (*) ros tws
     rseq los
@@ -391,13 +391,13 @@ interleave (a:as) bs = a : interleave bs as
 bflyS :: [Complex Float] -> ([Complex Float], [Complex Float])
 bflyS as = (los,rts)
   where
-    (ls,rs) = halve as
+    (_,(ls,rs)) = halve as
     los = zipWith (+) ls rs
     ros = zipWith (-) ls rs
     rts = zipWith (*) ros [tw (length as) i | i <- [0..(length ros) - 1]]
 
 -- missing from original file
-halve :: [a] -> ([a],[a])
-halve as = splitAt n' as
+halve :: [a] -> (Int,([a],[a]))
+halve as = (n',splitAt n' as)
   where
     n' = div (length as + 1) 2
