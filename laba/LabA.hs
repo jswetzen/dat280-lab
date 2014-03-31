@@ -112,7 +112,7 @@ ppscanl1 f as = ppscanl1' 5 f as
 ppscanl1' :: NFData a => Int -> (a -> a -> a) -> [a] -> [a]
 ppscanl1' _ _ [a] = [a]
 ppscanl1' 0 f as = sscanl1 f as
-ppscanl1' n f as = rnf ros `par` rnf los `pseq` init los ++ ros'
+ppscanl1' n f as = rnf ros `par` los `pseq` init los ++ ros'
   where
     (las,ras) = splitAt (cnd2 (length as)) as
     (los,ros) = (ppscanl1' (n-1) f las, ppscanl1' (n-1) f ras)
