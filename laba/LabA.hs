@@ -3,8 +3,8 @@ module Main where
 import Control.Parallel
 import Criterion.Main
 import System.Random (randoms, mkStdGen)
-import Control.Monad.Par
-import Control.Parallel.Strategies hiding (parMap)
+import Control.Monad.Par as P
+import Control.Parallel.Strategies as S
 import Control.Monad
 
 --------------Given.hs------------
@@ -15,12 +15,13 @@ import System.Random
 import Data.Random.Normal (normals')
 
 main :: IO ()
--- main = do sample <- generate2DSamplesList 100000 mX mY sdX sdY
---           -- print $ pfft 5 sample
---           -- print $ fft sample
+main = do sample <- generate2DSamplesList 100000 mX mY sdX sdY
+--           print $ pfft 5 sample
+--           print $ fft sample
 --           print $ runPar $ parfft 5 sample
---           -- print $ sfft sample
---        -- Testing if they give the same result
+--           print $ sfft sample
+          print $ pfft2 5 sample
+          -- Testing if they give the same result
           -- let fsol = fft sample
           -- let ssol = sfft sample
           -- print $ fsol == ssol
@@ -32,7 +33,7 @@ main :: IO ()
 -- main = print $ ppscanl1 slowOp $ manyInts
 -- main = print $ sscanl1 slowOp $ manyInts
 
--- {-
+{-
 main = benchTask2
 
 benchTask1 :: IO ()
@@ -72,7 +73,7 @@ mkFan op (i:is) = i:[op i k | k <- is]
 
 pmmkFan :: NFData a => (a -> a -> a) -> [a] -> Par [a]
 --pmmkFan op = return (\(i:is) -> i:parMap (op i) is)
-pmmkFan op (i:is) = do liftM (i:) $ parMap (op i) is
+pmmkFan op (i:is) = do liftM (i:) $ P.parMap (op i) is
 
 pplus :: Fan Int
 pplus = mkFan (+)
@@ -298,7 +299,7 @@ parbflyS as = do
     fork $ put ros $ zipWith (-) ls rs
     los' <- get los
     ros' <- get ros
-    tws <- spawn $ parMap (tw (length as)) [0..(length ls)]
+    tws <- spawn $ P.parMap (tw (length as)) [0..(length ls)]
     tws' <- get tws
     let rts = zipWith (*) ros' tws'
     return (los',rts)
@@ -351,16 +352,24 @@ pbflyS2 as = runEval $ do
     let (ls,rs) = halve as
     los <- rpar $ zipWith (+) ls rs
     ros <- rseq $ zipWith (-) ls rs
-    tws <- pMap (tw (length as)) [0..(length ros)-1]
-    rts <- rseq $ zipWith (*) ros tws
+    tws <- pMap 50 (tw (length as)) [0..(length ros)-1]
+--    tws <- return $ S.parMap rseq (tw (length as)) [0..(length ros)-1]
+    rts <- rpar $ zipWith (*) ros tws
+    rseq los
     return (los,rts)
       where
-        pMap :: (a -> b) -> [a] -> Eval [b]
-        pMap _ []     = return []
-        pMap f (b:bs) = do c <- rpar $ f b
-                           cs <- pMap f bs
-                           rseq c
-                           return (c:cs)
+        pMap :: Int -> (a -> b) -> [a] -> Eval [b]
+        pMap _ _ []     = return []
+        pMap 0 f bs     = return $ map f bs
+        --pMap d f (b:bs) = do c <- rpar $ f b
+        --                     cs <- pMap (d-1) f bs
+        --                     --rseq c
+        --                     --rseq cs
+        --                     return (c:cs)
+        pMap chunckSize f bs = do d <- rpar $ map f $ take chunckSize bs
+                                  ds <- pMap chunckSize f $ drop chunckSize bs
+                                  rseq d
+                                  return $ d ++ ds
 
 -- End parallel version
 
