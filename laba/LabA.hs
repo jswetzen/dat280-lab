@@ -366,10 +366,10 @@ pbflyS2 as = runEval $ do
         --                     --rseq c
         --                     --rseq cs
         --                     return (c:cs)
-        pMap chunckSize f bs = do d <- rpar $ map f $ take chunckSize bs
-                                  ds <- pMap chunckSize f $ drop chunckSize bs
-                                  rseq d
-                                  return $ d ++ ds
+        pMap chunkSize f bs = do d <- rpar $ map f $ take chunkSize bs
+                                 ds <- pMap chunkSize f $ drop chunkSize bs
+                                 rseq d
+                                 return $ d ++ ds
 
 -- End parallel version
 
