@@ -23,8 +23,9 @@ main :: IO ()
 --           print $ pfft2 5 sample
           -- Testing if they give the same result
           -- let fsol = fft sample
-          -- let ssol = sfft sample
-          -- print $ fsol == ssol
+          -- let psol = pfft 5 sample
+          -- let p2sol = pfft2 5 sample
+          -- print $ fsol == psol && fsol == p2sol
 -- main = print $ plscanl1 slowOp $ manyInts
 -- main = print $ chscanl1 slowOp $ manyInts
 -- main = print $ runPar $ pmscanl1 slowOp $ manyInts
@@ -50,13 +51,16 @@ benchTask1 = defaultMain
 benchTask2 :: IO ()
 benchTask2 = do
   samples <- generate2DSamplesList 10000 mX mY sdX sdY
+  let base_test = bgroup "Sequential" [bench "fft" (nf fft samples)] -- A base to test against
+      comparisons = bgroup "Parallel" $
+       [bench "pfft" (nf (pfft 5) samples), -- par & pseq, some speedup
+        bench "pfft2" (nf (pfft2 5) samples), -- rpar & resq, makes it worse
+        bench "sfft" (nf (sfft) samples),  -- Strategies (first try), really bad
+        bench "spfft" (nf (spfft) samples), -- divConq with Par, the best one yet
+        bench "parfft" (nf (runPar . (parfft 5)) samples)] -- Par monad, quite good
   defaultMain
-    [bench "fft" (nf fft samples), -- A base to test against
-     bench "pfft" (nf (pfft 5) samples), -- par & pseq, some speedup
-     bench "pfft2" (nf (pfft2 5) samples), -- rpar & resq, makes it worse
-     bench "sfft" (nf (sfft) samples),  -- Strategies (first try), really bad
-     bench "spfft" (nf (spfft) samples), -- divConq with Par, the best one yet
-     bench "parfft" (nf (runPar . (parfft 5)) samples)] -- Par monad, quite good
+    [base_test, -- A base to test against
+     comparisons] -- The rest of the tests
 -- -}
 
 manyInts :: [Int]
@@ -323,7 +327,7 @@ sfft as = divConq''
 -- Thought I did strategies first, but divConq uses Par
 spfft :: [Complex Float] -> [Complex Float]
 spfft [a] = [a]
-spfft as = divConq
+spfft as = divConq'
             (\(i,_) -> i<=0)
             half
             combine
