@@ -15,12 +15,12 @@ import System.Random
 import Data.Random.Normal (normals')
 
 main :: IO ()
-main = do sample <- generate2DSamplesList 100000 mX mY sdX sdY
+-- main = do sample <- generate2DSamplesList 100000 mX mY sdX sdY
 --           print $ pfft 5 sample
 --           print $ fft sample
 --           print $ runPar $ parfft 5 sample
 --           print $ sfft sample
-          print $ pfft2 5 sample
+--           print $ pfft2 5 sample
           -- Testing if they give the same result
           -- let fsol = fft sample
           -- let ssol = sfft sample
@@ -33,7 +33,7 @@ main = do sample <- generate2DSamplesList 100000 mX mY sdX sdY
 -- main = print $ ppscanl1 slowOp $ manyInts
 -- main = print $ sscanl1 slowOp $ manyInts
 
-{-
+-- {-
 main = benchTask2
 
 benchTask1 :: IO ()
@@ -269,12 +269,12 @@ pfft n as = ls `par` rs `pseq` interleave ls rs
     rs = pfft (n-1) ds
 
 pbflyS :: [Complex Float] -> ([Complex Float], [Complex Float])
-pbflyS as = tws `par` (los,rts)
+pbflyS as = tws `par` los `par` ros `seq` (los,rts)
   where
     (l,(ls,rs)) = halve as
     los = zipWith (+) ls rs
     ros = zipWith (-) ls rs
-    tws = [tw (length as) i | i <- [0..l]]
+    tws = map (tw (length as)) [0..l-1]
     rts = zipWith (*) ros tws
 
 -- Parallel version - Par Monad
@@ -297,9 +297,9 @@ parbflyS as = do
     ros <- new
     fork $ put los $ zipWith (+) ls rs
     fork $ put ros $ zipWith (-) ls rs
+    tws <- spawn $ P.parMap (tw (length as)) [0..l]
     los' <- get los
     ros' <- get ros
-    tws <- spawn $ P.parMap (tw (length as)) [0..l]
     tws' <- get tws
     let rts = zipWith (*) ros' tws'
     return (los',rts)
@@ -344,32 +344,28 @@ pfft2 d as  = runEval $ do
     ls <- rpar $ pfft2 (d-1) cs
     rs <- rseq $ pfft2 (d-1) ds
     rseq ls
-    return (interleave ls rs)
+    return $ interleave ls rs
 
 -- rpar & rseq
 pbflyS2 :: [Complex Float] -> ([Complex Float], [Complex Float])
 pbflyS2 as = runEval $ do
     let (l,(ls,rs)) = halve as
     los <- rpar $ zipWith (+) ls rs
-    ros <- rseq $ zipWith (-) ls rs
-    tws <- pMap 50 (tw (length as)) [0..l-1]
---    tws <- return $ S.parMap rseq (tw (length as)) [0..(length ros)-1]
-    rts <- rpar $ zipWith (*) ros tws
-    rseq los
+    ros <- rpar $ zipWith (-) ls rs
+    tws <- pMap (l `div` 50) (tw la) [0..l-1]
+    --rseq ros
+    rts <- rseq $ zipWith (*) ros tws
+    --rseq los
     return (los,rts)
       where
+        la = length as
         pMap :: Int -> (a -> b) -> [a] -> Eval [b]
         pMap _ _ []     = return []
-        pMap 0 f bs     = return $ map f bs
-        --pMap d f (b:bs) = do c <- rpar $ f b
-        --                     cs <- pMap (d-1) f bs
-        --                     --rseq c
-        --                     --rseq cs
-        --                     return (c:cs)
-        pMap chunkSize f bs = do d <- rpar $ map f $ take chunkSize bs
-                                 ds <- pMap chunkSize f $ drop chunkSize bs
-                                 rseq d
-                                 return $ d ++ ds
+        pMap c f bs | c < length bs = return $ map f bs
+                    | otherwise     = do d <- rpar $ map f $ take c bs
+                                         ds <- pMap c f $ drop c bs
+                                         --rseq d
+                                         return $ d ++ ds
 
 -- End parallel version
 
