@@ -82,14 +82,14 @@ fill(M) ->
 %% refine entries which are lists by removing numbers they are known
 %% not to be
 
-refine(M) ->
+orig_refine(M) ->
   NewM =
-  p_refine_rows(
+  refine_rows(
     transpose(
-      p_refine_rows(
+      refine_rows(
         transpose(
           unblocks(
-            p_refine_rows(
+            refine_rows(
               blocks(M))))))),
   if M==NewM ->
        M;
@@ -97,17 +97,97 @@ refine(M) ->
        refine(NewM)
   end.
 
-p_refine_rows([Row]) ->
-  [refine_row(Row)];
+
+refine(M) ->
+  flush(),
+  Parent = self(),
+  BlockRef = make_ref(),
+  ColRef = make_ref(),
+  RowRef = make_ref(),
+  spawn_link(fun() ->
+                 Parent ! {BlockRef, catch unblocks(
+                                       refine_rows(
+                                         blocks(M)))}
+             end),
+  spawn_link(fun() ->
+                 Parent ! {ColRef, catch transpose(
+                                       refine_rows(
+                                         transpose(M)))}
+             end),
+  spawn_link(fun() ->
+                 Parent ! {RowRef, catch refine_rows(M)}
+             end),
+  M1 = receive {BlockRef, {'EXIT',_}} -> exit(no_solution);
+               {BlockRef, X} -> X end,
+  M2 = receive {ColRef, {'EXIT',_}} -> exit(no_solution);
+               {ColRef, Y} -> Y end,
+  M3 = receive {RowRef, {'EXIT',_}} -> exit(no_solution);
+               {RowRef, Z} -> Z end,
+  NewM = join_solutions(M1,M2,M3),
+  if M==NewM ->
+       M;
+     true ->
+       refine(NewM)
+  end.
+
+join_solutions(M1,M2,M3) ->
+  [ begin
+      % [ from_list(intersection(to_list(C1),to_list(C2),to_list(C3)))
+      [ from_list(intersect(C1,intersect(C2,C3)))
+       || {C1,C2,C3} <- lists:zip3(R1,R2,R3)]
+    end
+   || {R1,R2,R3} <- lists:zip3(M1,M2,M3)].
+
+intersect(L1,L2) ->
+  lists:filter(fun(E) -> lists:member(E,to_list(L2)) end,to_list(L1)).
+
+intersection(List1, List2, List3) ->
+  Set1 = sets:from_list(List1),
+  Set2 = sets:from_list(List2),
+  Set3 = sets:from_list(List3),
+  Set12 = sets:intersection(Set1,Set2),
+  sets:to_list(sets:intersection(Set12,Set3)).
+
+to_list(X) ->
+  if is_list(X) -> X;
+     true       -> [X]
+  end.
+
+from_list([X]) -> X;
+from_list(X) -> X.
+
+% refine with parallel rows (really bad idea)
+p_row_refine(M) ->
+  NewM =
+  p_refine_rows(
+    transpose(
+      refine_rows(
+        transpose(
+          unblocks(
+            refine_rows(
+              blocks(M))))))),
+  if M==NewM ->
+       M;
+     true ->
+       refine(NewM)
+  end.
+
+p_refine_rows([]) ->
+  [];
 p_refine_rows([Row|Rest]) ->
   Parent = self(),
   Ref = make_ref(),
   spawn(fun() ->
-                 Parent ! {Ref, catch refine_row(Row)}
-             end),
+            Parent ! {Ref, catch refine_row(Row)}
+        end),
   NewRest = p_refine_rows(Rest),
-  receive {Ref, NewRow} ->
-            [NewRow | NewRest] end.
+  receive
+    % vi behöver använda flush() för att inte ackumulera meddelanden.
+    % exit() behövs för att vi inte ska fortsätta leta när något har gått snett
+    % men då är det en massa processer som inte får sina meddelanden lästa.
+    {Ref, {'EXIT', _}} -> exit(no_solution);
+    {Ref, NewRow}      -> [NewRow | NewRest]
+  end.
 
 refine_rows(M) ->
   lists:map(fun refine_row/1,M).
@@ -135,6 +215,13 @@ refine_row(Row) ->
       NewRow;
     false ->
       exit(no_solution)
+  end.
+
+% flush the message queue
+
+flush() ->
+  receive _ -> flush()
+  after 0   -> ok
   end.
 
 is_exit({'EXIT',_}) ->

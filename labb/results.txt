@@ -39,4 +39,10 @@ Not that good, considering the number of cores.
 Some of the cores are probably idle for too long.
 
 
+---- Processing Col, Row and Block in parallel ----
+
+Sequential run (with new sudoku script): 627368
+Parallel: 9048145
+Slowdown: 14.42
+
 
