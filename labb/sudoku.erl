@@ -238,6 +238,18 @@ benchmarks() ->
   {ok,Puzzles} = file:consult("problems.txt"),
   timer:tc(?MODULE,benchmarks,[Puzzles]).
 
+p_benchmarks([{Name,M}]) -> [{Name,bm(fun() -> solve(M) end)}];
+p_benchmarks([{Name,M}|Puzzles]) ->
+  Parent = self(),
+  Ref = make_ref(),
+  spawn_link(fun() -> Parent ! {Ref, bm(fun() -> solve(M) end)} end),
+  Solutions = p_benchmarks(Puzzles),
+  receive {Ref,Solution} -> [{Name,Solution}|Solutions] end.
+
+p_benchmarks() ->
+  {ok,Puzzles} = file:consult("problems.txt"),
+  timer:tc(?MODULE,p_benchmarks,[Puzzles]).
+
 %% check solutions for validity
 
 valid_rows(M) ->
