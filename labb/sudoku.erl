@@ -84,18 +84,30 @@ fill(M) ->
 
 refine(M) ->
   NewM =
-  refine_rows(
+  p_refine_rows(
     transpose(
-      refine_rows(
+      p_refine_rows(
         transpose(
           unblocks(
-            refine_rows(
+            p_refine_rows(
               blocks(M))))))),
   if M==NewM ->
        M;
      true ->
        refine(NewM)
   end.
+
+p_refine_rows([Row]) ->
+  [refine_row(Row)];
+p_refine_rows([Row|Rest]) ->
+  Parent = self(),
+  Ref = make_ref(),
+  spawn(fun() ->
+                 Parent ! {Ref, catch refine_row(Row)}
+             end),
+  NewRest = p_refine_rows(Rest),
+  receive {Ref, NewRow} ->
+            [NewRow | NewRest] end.
 
 refine_rows(M) ->
   lists:map(fun refine_row/1,M).
@@ -237,6 +249,13 @@ benchmarks(Puzzles) ->
 benchmarks() ->
   {ok,Puzzles} = file:consult("problems.txt"),
   timer:tc(?MODULE,benchmarks,[Puzzles]).
+
+benchmark(Puzzles) ->
+  [solve(M) || {challenge1,M} <- Puzzles].
+
+benchmark() ->
+  {ok,Puzzles} = file:consult("problems.txt"),
+  timer:tc(?MODULE,benchmark,[Puzzles]).
 
 p_benchmarks([{Name,M}]) -> [{Name,bm(fun() -> solve(M) end)}];
 p_benchmarks([{Name,M}|Puzzles]) ->
