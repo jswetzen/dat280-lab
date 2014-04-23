@@ -131,7 +131,7 @@ solved_row(Row) ->
 
 %% how hard is the puzzle?
 
-hard(M) ->                
+hard(M) ->
     lists:sum(
       [lists:sum(
       [if is_list(X) ->
@@ -236,4 +236,4 @@ benchmarks() ->
 pbenchmarks() ->
   {ok,Puzzles} = file:consult("problems.txt"),
   timer:tc(?MODULE,pbenchmarks,[Puzzles]).
-                
+
