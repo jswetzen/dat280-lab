@@ -16,8 +16,8 @@ transpose([Row|M]) ->
 
 %% prop_transpose() ->
 %%     ?FORALL({M,N},{nat(),nat()},
-%%      ?FORALL(Mat,matrix(M+1,N+1),
-%%        transpose(transpose(Mat)) == Mat)).
+%%       ?FORALL(Mat,matrix(M+1,N+1),
+%%            transpose(transpose(Mat)) == Mat)).
 
 %% map a matrix to a list of 3x3 blocks, each represented by the list
 %% of elements in row order
@@ -47,7 +47,7 @@ unblocks(M) ->
 
 %% prop_blocks() ->
 %%     ?FORALL(M,matrix(9,9),
-%%      unblocks(blocks(M)) == M).
+%%       unblocks(blocks(M)) == M).
 
 %% decide whether a position is safe
 
@@ -84,7 +84,7 @@ fill(M) ->
 
 refine(M) ->
   NewM =
-  refine_rows(
+  p_refine_rows(
     transpose(
       refine_rows(
         transpose(
@@ -97,12 +97,21 @@ refine(M) ->
        refine(NewM)
   end.
 
-refine_rows(M) ->
-  lists:map(fun refine_row/1,M).
+p_refine_rows([]) ->
+  [];
+% p_refine_rows([Row]) ->
+%   [refine_row(Row)];
+p_refine_rows([Row|Rest]) ->
+  Parent = self(),
+  Ref = make_ref(),
+  spawn_link(fun() ->
+                 Parent ! {Ref, refine_row(Row)}
+             end),
+  NewRest = p_refine_rows(Rest),
+  receive {Ref, NewRow} -> [NewRow|NewRest] end.
 
 refine_row(Row) ->
   Entries = entries(Row),
-  NewRow =
   [if is_list(X) ->
         case X--Entries of
           [] ->
@@ -115,15 +124,26 @@ refine_row(Row) ->
       true ->
         X
    end
-   || X <- Row],
-  NewEntries = entries(NewRow),
-  %% check we didn't create a duplicate entry
-  case length(lists:usort(NewEntries)) == length(NewEntries) of
-    true ->
-      NewRow;
-    false ->
-      exit(no_solution)
-  end.
+   || X <- Row].
+
+refine_rows(M) ->
+  [begin
+     Entries = entries(Row),
+     [if is_list(X) ->
+           case X--Entries of
+             [] ->
+               exit(no_solution);
+             [Y] ->
+               Y;
+             NewX ->
+               NewX
+           end;
+         true ->
+           X
+      end
+      || X <- Row]
+   end
+   || Row <- M].
 
 is_exit({'EXIT',_}) ->
   true;
@@ -140,7 +160,7 @@ solved_row(Row) ->
 
 %% how hard is the puzzle?
 
-hard(M) ->          
+hard(M) ->
   lists:sum(
     [lists:sum(
        [if is_list(X) ->
@@ -185,20 +205,14 @@ update_nth(I,X,Xs) ->
 
 %% prop_update() ->
 %%     ?FORALL(L,list(int()),
-%%      ?IMPLIES(L/=[],
-%%         ?FORALL(I,choose(1,length(L)),
-%%           update_nth(I,lists:nth(I,L),L) == L))).
+%%       ?IMPLIES(L/=[],
+%%             ?FORALL(I,choose(1,length(L)),
+%%                  update_nth(I,lists:nth(I,L),L) == L))).
 
 %% solve a puzzle
 
 solve(M) ->
-  Solution = solve_refined(refine(fill(M))),
-  case valid_solution(Solution) of
-    true ->
-      Solution;
-    false ->
-      exit({invalid_solution,Solution})
-  end.
+  solve_refined(refine(fill(M))).
 
 solve_refined(M) ->
   case solved(M) of
@@ -234,18 +248,21 @@ repeat(F) ->
 benchmarks(Puzzles) ->
   [{Name,bm(fun()->solve(M) end)} || {Name,M} <- Puzzles].
 
+pbenchmarks([{Name,M}])-> [{Name,bm(fun() -> solve(M) end)}];
+pbenchmarks([{Name,M}|Puzzles]) ->
+  Parent = self(),
+  Ref = make_ref(),
+  spawn_link(fun() ->
+                 Parent ! {Ref, bm(fun() -> solve(M) end)}
+             end),
+  Solutions = pbenchmarks(Puzzles),
+  receive {Ref, Solution} -> [{Name,Solution}|Solutions] end.
+
 benchmarks() ->
   {ok,Puzzles} = file:consult("problems.txt"),
   timer:tc(?MODULE,benchmarks,[Puzzles]).
 
-%% check solutions for validity
-
-valid_rows(M) ->
-  lists:all(fun valid_row/1,M).
-
-valid_row(Row) ->
-  lists:usort(Row) == lists:seq(1,9).
-
-valid_solution(M) ->
-  valid_rows(M) andalso valid_rows(transpose(M)) andalso valid_rows(blocks(M)).
+pbenchmarks() ->
+  {ok,Puzzles} = file:consult("problems.txt"),
+  timer:tc(?MODULE,pbenchmarks,[Puzzles]).
 

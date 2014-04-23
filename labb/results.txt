@@ -1,3 +1,5 @@
+On a 2 core machine:
+
 1> c(sudoku).
 {ok,sudoku}
 2> sudoku:benchmarks().
@@ -26,5 +28,15 @@ Before: ~63 seconds
 
 After: ~37 seconds.
 Speedup: 1.72
+Not that bad.
+
+
+On a 4 core machine:
+Before: 34889000
+After: 14180000
+Speedup: 2.46
+Not that good, considering the number of cores.
+Some of the cores are probably idle for too long.
+
 
 
