@@ -16,8 +16,8 @@ transpose([Row|M]) ->
 
 %% prop_transpose() ->
 %%     ?FORALL({M,N},{nat(),nat()},
-%% 	    ?FORALL(Mat,matrix(M+1,N+1),
-%% 		    transpose(transpose(Mat)) == Mat)).
+%%       ?FORALL(Mat,matrix(M+1,N+1),
+%%            transpose(transpose(Mat)) == Mat)).
 
 %% map a matrix to a list of 3x3 blocks, each represented by the list
 %% of elements in row order
@@ -31,29 +31,29 @@ blocks(M) ->
     Blocks = [triples(X) || X <- transpose([triples(Row) || Row <- M])],
     lists:append(
       lists:map(fun(X)->
-			lists:map(fun lists:append/1, X)
-		end,
-		Blocks)).
+               lists:map(fun lists:append/1, X)
+          end,
+          Blocks)).
 
 unblocks(M) ->
     lists:map(
       fun lists:append/1,
       transpose(
-	lists:map(
-	  fun lists:append/1,
-	  lists:map(
-	    fun(X)->lists:map(fun triples/1,X) end,
-	    triples(M))))).
+     lists:map(
+       fun lists:append/1,
+       lists:map(
+         fun(X)->lists:map(fun triples/1,X) end,
+         triples(M))))).
 
 %% prop_blocks() ->
 %%     ?FORALL(M,matrix(9,9),
-%% 	    unblocks(blocks(M)) == M).
+%%       unblocks(blocks(M)) == M).
 
 %% decide whether a position is safe
 
 entries(Row) ->
     [X || X <- Row,
-	  1 =< X andalso X =< 9].
+       1 =< X andalso X =< 9].
 
 safe_entries(Row) ->
     Entries = entries(Row),
@@ -64,17 +64,17 @@ safe_rows(M) ->
 
 safe(M) ->
     safe_rows(M) andalso
-	safe_rows(transpose(M)) andalso
-	safe_rows(blocks(M)).
+     safe_rows(transpose(M)) andalso
+     safe_rows(blocks(M)).
 
 %% fill blank entries with a list of all possible values 1..9
 
 fill(M) ->
     Nine = lists:seq(1,9),
     [[if 1=<X, X=<9 ->
-	      X;
-	 true ->
-	      Nine
+           X;
+      true ->
+           Nine
       end
       || X <- Row]
      || Row <- M].
@@ -84,35 +84,35 @@ fill(M) ->
 
 refine(M) ->
     NewM =
-	refine_rows(
-	  transpose(
-	    refine_rows(
-	      transpose(
-		unblocks(
-		  refine_rows(
-		    blocks(M))))))),
+     refine_rows(
+       transpose(
+         refine_rows(
+           transpose(
+          unblocks(
+            refine_rows(
+              blocks(M))))))),
     if M==NewM ->
-	    M;
+         M;
        true ->
-	    refine(NewM)
+         refine(NewM)
     end.
 
 refine_rows(M) ->
     [begin
-	 Entries = entries(Row),
-	 [if is_list(X) ->
-		  case X--Entries of
-		      [] ->
-			  exit(no_solution);
-		      [Y] ->
-			  Y;
-		      NewX ->
-			  NewX
-		  end;
-	     true ->
-		  X
-	  end
-	  || X <- Row]
+      Entries = entries(Row),
+      [if is_list(X) ->
+            case X--Entries of
+                [] ->
+                 exit(no_solution);
+                [Y] ->
+                 Y;
+                NewX ->
+                 NewX
+            end;
+          true ->
+            X
+       end
+       || X <- Row]
      end
      || Row <- M].
 
@@ -131,15 +131,15 @@ solved_row(Row) ->
 
 %% how hard is the puzzle?
 
-hard(M) ->		      
+hard(M) ->                
     lists:sum(
       [lists:sum(
-	 [if is_list(X) ->
-		  length(X);
-	     true ->
-		  0
-	  end
-	  || X <- Row])
+      [if is_list(X) ->
+            length(X);
+          true ->
+            0
+       end
+       || X <- Row])
        || Row <- M]).
 
 %% choose a position {I,J,Guesses} to guess an element, with the
@@ -148,10 +148,10 @@ hard(M) ->
 guess(M) ->
     Nine = lists:seq(1,9),
     {_,I,J,X} =
-	lists:min([{length(X),I,J,X}
-		   || {I,Row} <- lists:zip(Nine,M),
-		      {J,X} <- lists:zip(Nine,Row),
-		      is_list(X)]),
+     lists:min([{length(X),I,J,X}
+             || {I,Row} <- lists:zip(Nine,M),
+                {J,X} <- lists:zip(Nine,Row),
+                is_list(X)]),
     {I,J,X}.
 
 %% given a matrix, guess an element to form a list of possible
@@ -161,10 +161,10 @@ guesses(M) ->
     {I,J,Guesses} = guess(M),
     Ms = [catch refine(update_element(M,I,J,G)) || G <- Guesses],
     SortedGuesses =
-	lists:sort(
-	  [{hard(NewM),NewM}
-	   || NewM <- Ms,
-	      not is_exit(NewM)]),
+     lists:sort(
+       [{hard(NewM),NewM}
+        || NewM <- Ms,
+           not is_exit(NewM)]),
     [G || {_,G} <- SortedGuesses].
 
 update_element(M,I,J,G) ->
@@ -176,9 +176,9 @@ update_nth(I,X,Xs) ->
 
 %% prop_update() ->
 %%     ?FORALL(L,list(int()),
-%% 	    ?IMPLIES(L/=[],
-%% 		     ?FORALL(I,choose(1,length(L)),
-%% 			     update_nth(I,lists:nth(I,L),L) == L))).
+%%       ?IMPLIES(L/=[],
+%%             ?FORALL(I,choose(1,length(L)),
+%%                  update_nth(I,lists:nth(I,L),L) == L))).
 
 %% solve a puzzle
 
@@ -187,10 +187,10 @@ solve(M) ->
 
 solve_refined(M) ->
     case solved(M) of
-	true ->
-	    M;
-	false ->
-	    solve_one(guesses(M))
+     true ->
+         M;
+     false ->
+         solve_one(guesses(M))
     end.
 
 solve_one([]) ->
@@ -199,10 +199,10 @@ solve_one([M]) ->
     solve_refined(M);
 solve_one([M|Ms]) ->
     case catch solve_refined(M) of
-	{'EXIT',no_solution} ->
-	    solve_one(Ms);
-	Solution ->
-	    Solution
+     {'EXIT',no_solution} ->
+         solve_one(Ms);
+     Solution ->
+         Solution
     end.
 
 %% benchmarks
@@ -236,4 +236,4 @@ benchmarks() ->
 pbenchmarks() ->
   {ok,Puzzles} = file:consult("problems.txt"),
   timer:tc(?MODULE,pbenchmarks,[Puzzles]).
-		      
+                
