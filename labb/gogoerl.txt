@@ -1,2 +1,5 @@
 1>c(sudoku).
 2>sudoku:benchmarks().
+3>percept:profile("test.dat",{sudoku,pbenchmarks,[]},[procs]).
+4>percept:analyze("test.dat").
+5>percept:start_webserver(8080).
