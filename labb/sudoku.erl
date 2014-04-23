@@ -219,7 +219,21 @@ repeat(F) ->
 benchmarks(Puzzles) ->
     [{Name,bm(fun()->solve(M) end)} || {Name,M} <- Puzzles].
 
+pbenchmarks([{Name,M}])-> [{Name,bm(fun() -> solve(M) end)}];
+pbenchmarks([{Name,M}|Puzzles]) ->
+    Parent = self(),
+    Ref = make_ref(),
+    spawn_link(fun() ->
+        Parent ! {Ref, bm(fun() -> solve(M) end)}
+    end),
+    Solutions = pbenchmarks(Puzzles),
+    receive {Ref, Solution} -> [{Name,Solution}|Solutions] end.
+
 benchmarks() ->
   {ok,Puzzles} = file:consult("problems.txt"),
   timer:tc(?MODULE,benchmarks,[Puzzles]).
+
+pbenchmarks() ->
+  {ok,Puzzles} = file:consult("problems.txt"),
+  timer:tc(?MODULE,pbenchmarks,[Puzzles]).
 		      

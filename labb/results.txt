@@ -1,0 +1,30 @@
+1> c(sudoku).
+{ok,sudoku}
+2> sudoku:benchmarks().
+{63131028,
+ [{wildcat,0.28908},
+  {diabolical,3.7957840000000003},
+  {vegard_hanssen,13.293130999999999},
+  {challenge,5.208581000000001},
+  {challenge1,23.667727},
+  {extreme,11.591126000000001},
+  {seventeen,5.285572}]}
+
+Before: ~63 seconds
+
+1> c(sudoku).
+{ok,sudoku}
+2> sudoku:pbenchmarks().
+{36785085,
+ [{wildcat,1.8779970000000001},
+  {diabolical,13.028182000000001},
+  {vegard_hanssen,27.093322},
+  {challenge,16.842435000000002},
+  {challenge1,36.784518},
+  {extreme,22.749260999999997},
+  {seventeen,17.259149}]}
+
+After: ~37 seconds.
+Speedup: 1.72
+
+

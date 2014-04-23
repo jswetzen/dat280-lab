@@ -7,6 +7,9 @@
 *.hi
 *.exe
 
+# ThreadScope
+*.eventlog
+
 # Cabal
 .cabal-sandbox
 *cabal.sandbox.config
@@ -18,3 +21,4 @@
 
 # Erlang
 *.beam
+*.dat
