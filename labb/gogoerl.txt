@@ -1,0 +1,2 @@
+1>c(sudoku).
+2>sudoku:benchmarks().
