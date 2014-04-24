@@ -82,19 +82,19 @@ fill(M) ->
 %% refine entries which are lists by removing numbers they are known
 %% not to be
 
-refine(M,Method) ->
-  case Method of
-    par_rows ->
-      p_row_refine(M);
-    par_blocks ->
-      p_block_refine(M);
-    _ ->
-      refine(M)
-  end.
+%refine(M,Method) ->
+%  case Method of
+%    par_rows ->
+%      p_row_refine(M);
+%    par_blocks ->
+%      p_block_refine(M);
+%    _ ->
+%      refine(M)
+%  end.
 
-refine(M) ->
+orig_refine(M) ->
   NewM =
-  p_refine_rows(
+  refine_rows(
     transpose(
       refine_rows(
         transpose(
@@ -108,7 +108,7 @@ refine(M) ->
   end.
 
 
-p_block_refine(M) ->
+refine(M) ->
   flush(),
   Parent = self(),
   BlockRef = make_ref(),
@@ -137,7 +137,7 @@ p_block_refine(M) ->
   if M==NewM ->
        M;
      true ->
-       p_block_refine(NewM)
+       refine(NewM)
   end.
 
 join_solutions(M1,M2,M3) ->
@@ -277,15 +277,15 @@ guesses(M) ->
         not is_exit(NewM)]),
   [G || {_,G} <- SortedGuesses].
 
-guesses(M,Method) ->
-  {I,J,Guesses} = guess(M),
-  Ms = [catch refine(update_element(M,I,J,G),Method) || G <- Guesses],
-  SortedGuesses =
-  lists:sort(
-    [{hard(NewM),NewM}
-     || NewM <- Ms,
-        not is_exit(NewM)]),
-  [G || {_,G} <- SortedGuesses].
+%guesses(M,Method) ->
+%  {I,J,Guesses} = guess(M),
+%  Ms = [catch refine(update_element(M,I,J,G),Method) || G <- Guesses],
+%  SortedGuesses =
+%  lists:sort(
+%    [{hard(NewM),NewM}
+%     || NewM <- Ms,
+%        not is_exit(NewM)]),
+%  [G || {_,G} <- SortedGuesses].
 
 update_element(M,I,J,G) ->
   update_nth(I,update_nth(J,G,lists:nth(I,M)),M).
@@ -316,30 +316,30 @@ solve_refined(M) ->
     true ->
       M;
     false ->
-      p_solve_one(guesses(M))
+      solve_one(guesses(M))
   end.
 
-solve(M,Method) ->
-  Solution = solve_refined(refine(fill(M),Method),Method),
-  case valid_solution(Solution) of
-    true ->
-      Solution;
-    false ->
-      exit({invalid_solution,Solution})
-  end.
+%solve(M,Method) ->
+%  Solution = solve_refined(refine(fill(M),Method),Method),
+%  case valid_solution(Solution) of
+%    true ->
+%      Solution;
+%    false ->
+%      exit({invalid_solution,Solution})
+%  end.
 
-solve_refined(M,Method) ->
-  case solved(M) of
-    true ->
-      M;
-    false ->
-      case Method of
-        par_guesses ->
-          p_solve_one(guesses(M,Method),Method);
-        _         ->
-          solve_one(guesses(M,Method),Method)
-      end
-  end.
+%solve_refined(M,Method) ->
+%  case solved(M) of
+%    true ->
+%      M;
+%    false ->
+%      case Method of
+%        par_guesses ->
+%          p_solve_one(guesses(M,Method),Method);
+%        _         ->
+%          solve_one(guesses(M,Method),Method)
+%      end
+%  end.
 
 solve_one([]) ->
   exit(no_solution);
@@ -353,17 +353,17 @@ solve_one([M|Ms]) ->
       Solution
   end.
 
-solve_one([],_) ->
-  exit(no_solution);
-solve_one([M],Method) ->
-  solve_refined(M,Method);
-solve_one([M|Ms],Method) ->
-  case catch solve_refined(M,Method) of
-    {'EXIT',no_solution} ->
-      solve_one(Ms,Method);
-    Solution ->
-      Solution
-  end.
+%solve_one([],_) ->
+%  exit(no_solution);
+%solve_one([M],Method) ->
+%  solve_refined(M,Method);
+%solve_one([M|Ms],Method) ->
+%  case catch solve_refined(M,Method) of
+%    {'EXIT',no_solution} ->
+%      solve_one(Ms,Method);
+%    Solution ->
+%      Solution
+%  end.
 
 p_solve_one([],Ref,_) ->
   wait_for_solution(Ref);
@@ -377,17 +377,17 @@ p_solve_one(Ms) ->
   Parent = self(),
   p_solve_one(Ms,Ref,Parent).
 
-p_solve_one([],Ref,_,_) ->
-  wait_for_solution(Ref);
-p_solve_one([M|Ms],Ref,Parent,Method) ->
-  spawn(fun() ->
-            Parent ! {Ref, catch solve_refined(M,Method)}
-        end),
-  p_solve_one(Ms,Ref,Parent,Method).
-p_solve_one(Ms,Method) ->
-  Ref = make_ref(),
-  Parent = self(),
-  p_solve_one(Ms,Ref,Parent,Method).
+%p_solve_one([],Ref,_,_) ->
+%  wait_for_solution(Ref);
+%p_solve_one([M|Ms],Ref,Parent,Method) ->
+%  spawn(fun() ->
+%            Parent ! {Ref, catch solve_refined(M,Method)}
+%        end),
+%  p_solve_one(Ms,Ref,Parent,Method).
+%p_solve_one(Ms,Method) ->
+%  Ref = make_ref(),
+%  Parent = self(),
+%  p_solve_one(Ms,Ref,Parent,Method).
 
 wait_for_solution(Ref) ->
   receive

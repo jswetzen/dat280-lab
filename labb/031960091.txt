@@ -1,0 +1,63 @@
+1> c(sudoku).
+{ok,sudoku}
+2> sudoku:benchmark().
+GUESS
+{980000,[{challenge1,98.0}]}
+3> sudoku:benchmarks().
+{5814000,
+ [{wildcat,0.3},
+  {diabolical,17.6},
+  {vegard_hanssen,53.8},
+  {challenge,3.9},
+  {challenge1,105.2},
+  {extreme,14.4},
+  {seventeen,226.7},
+  {inkala,159.5}]}
+
+ORIGINAL
+4> c(sudoku).
+{ok,sudoku}
+5> sudoku:benchmarks().
+{7684000,
+ [{wildcat,0.3},
+  {diabolical,41.3},
+  {vegard_hanssen,88.8},
+  {challenge,6.1},
+  {challenge1,329.8},
+  {extreme,8.5},
+  {seventeen,30.6},
+  {inkala,263.0}]}
+6> sudoku:benchmark().
+{3319000,[{challenge1,331.9}]}
+
+ROWS
+7> c(sudoku).
+{ok,sudoku}
+8> sudoku:benchmark().
+{70396000,[{challenge1,7039.6}]}
+9> sudoku:benchmarks().
+{715778000,
+ [{wildcat,12.0},
+  {diabolical,1737.5},
+  {vegard_hanssen,4323.2},
+  {challenge,321.1},
+  {challenge1,26617.7},
+  {extreme,882.1},
+  {seventeen,3327.7},
+  {inkala,34356.5}]}
+10> c(sudoku).
+
+ROWS, COLUMNS & BLOCKS
+{ok,sudoku}
+11> sudoku:benchmarks().
+{22343000,
+ [{wildcat,1.3},
+  {diabolical,125.5},
+  {vegard_hanssen,263.3},
+  {challenge,18.1},
+  {challenge1,969.6},
+  {extreme,23.2},
+  {seventeen,90.6},
+  {inkala,742.7}]}
+12> sudoku:benchmark().
+{9698000,[{challenge1,969.8}]}
