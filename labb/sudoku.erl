@@ -414,7 +414,7 @@ benchmarks() ->
   timer:tc(?MODULE,benchmarks,[Puzzles]).
 
 benchmark(Puzzles) ->
-  [solve(M) || {challenge1,M} <- Puzzles].
+  [{challenge1,bm(fun() -> solve(M) end)} || {challenge1,M} <- Puzzles].
 
 benchmark() ->
   {ok,Puzzles} = file:consult("problems.txt"),
