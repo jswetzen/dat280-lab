@@ -242,7 +242,7 @@ solved_row(Row) ->
 
 %% how hard is the puzzle?
 
-hard(M) ->          
+hard(M) ->
   lists:sum(
     [lists:sum(
        [if is_list(X) ->
@@ -333,7 +333,7 @@ solve_one([{_,M}|Ms]) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%% Parallelizing Guess %%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%% Replace the solce_one %%%
+%%% Replace the solve_one %%%
 % above with the one below  %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -358,6 +358,8 @@ wait_for_solution(Ref) ->
 %% benchmarks
 
 -define(EXECUTIONS,1).
+% this is the problem that benchmark/0 runs
+-define(PROBLEM,challenge1).
 
 bm(F) ->
   {T,_} = timer:tc(?MODULE,repeat,[F]),
@@ -373,9 +375,11 @@ benchmarks() ->
   {ok,Puzzles} = file:consult("problems.txt"),
   timer:tc(?MODULE,benchmarks,[Puzzles]).
 
+% used by benchmark/0, selects one problem and solves it
 benchmark(Puzzles) ->
-  [{challenge1,bm(fun() -> solve(M) end)} || {challenge1,M} <- Puzzles].
+  [{?PROBLEM,bm(fun() -> solve(M) end)} || {?PROBLEM,M} <- Puzzles].
 
+% benchmark one particular problem
 benchmark() ->
   {ok,Puzzles} = file:consult("problems.txt"),
   timer:tc(?MODULE,benchmark,[Puzzles]).
