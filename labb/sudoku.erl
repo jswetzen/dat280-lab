@@ -285,12 +285,6 @@ update_nth(I,X,Xs) ->
   {Pre,[_|Post]} = lists:split(I-1,Xs),
   Pre++[X|Post].
 
-%% prop_update() ->
-%%     ?FORALL(L,list(int()),
-%%      ?IMPLIES(L/=[],
-%%         ?FORALL(I,choose(1,length(L)),
-%%           update_nth(I,lists:nth(I,L),L) == L))).
-
 %% solve a puzzle
 
 solve(M) ->
