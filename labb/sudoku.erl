@@ -82,16 +82,6 @@ fill(M) ->
 %% refine entries which are lists by removing numbers they are known
 %% not to be
 
-%refine(M,Method) ->
-%  case Method of
-%    par_rows ->
-%      p_row_refine(M);
-%    par_blocks ->
-%      p_block_refine(M);
-%    _ ->
-%      refine(M)
-%  end.
-
 refine(M) ->
   NewM =
   refine_rows(
@@ -107,6 +97,11 @@ refine(M) ->
        refine(NewM)
   end.
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Parallelzation of Row, Columns & Blocks %
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Use this function isntead of refine/1 %%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 p_block_refine(M) ->
   flush(),
@@ -157,6 +152,12 @@ to_list(X) ->
 
 from_list([X]) -> X;
 from_list(X) -> X.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%% Parallelization of row %%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Use this instead of refine/1 %
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % refine with parallel rows (really bad idea)
 p_row_refine(M) ->
@@ -277,16 +278,6 @@ guesses(M) ->
         not is_exit(NewM)]),
   [{H,G} || {H,G} <- SortedGuesses].
 
-%guesses(M,Method) ->
-%  {I,J,Guesses} = guess(M),
-%  Ms = [catch refine(update_element(M,I,J,G),Method) || G <- Guesses],
-%  SortedGuesses =
-%  lists:sort(
-%    [{hard(NewM),NewM}
-%     || NewM <- Ms,
-%        not is_exit(NewM)]),
-%  [G || {_,G} <- SortedGuesses].
-
 update_element(M,I,J,G) ->
   update_nth(I,update_nth(J,G,lists:nth(I,M)),M).
 
@@ -319,28 +310,6 @@ solve_refined(M) ->
       solve_one(guesses(M))
   end.
 
-%solve(M,Method) ->
-%  Solution = solve_refined(refine(fill(M),Method),Method),
-%  case valid_solution(Solution) of
-%    true ->
-%      Solution;
-%    false ->
-%      exit({invalid_solution,Solution})
-%  end.
-
-%solve_refined(M,Method) ->
-%  case solved(M) of
-%    true ->
-%      M;
-%    false ->
-%      case Method of
-%        par_guesses ->
-%          p_solve_one(guesses(M,Method),Method);
-%        _         ->
-%          solve_one(guesses(M,Method),Method)
-%      end
-%  end.
-
 solve_one_seq([]) ->
   exit(no_solution);
 solve_one_seq([{_,M}]) ->
@@ -367,6 +336,13 @@ solve_one([{_,M}|Ms]) ->
       Solution
   end.
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%% Parallelizing Guess %%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%% Replace the solce_one %%%
+% above with the one below  %
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 % solve_one([],Ref,_) ->
 %   wait_for_solution(Ref);
 % solve_one([{_,M}|Ms],Ref,Parent) ->
@@ -378,37 +354,6 @@ solve_one([{_,M}|Ms]) ->
 %   Ref = make_ref(),
 %   Parent = self(),
 %   solve_one(Ms,Ref,Parent).
-
-% p_solve_one_limit([],Ref,_) ->
-%   wait_for_solution(Ref);
-% p_solve_one_limit([{H,M}|Ms],Ref,Parent) ->
-%   spawn(fun() ->
-%             Parent ! {Ref, catch solve_refined(M)}
-%         end),
-%   if H > 100 ->
-%        p_solve_one_limit(Ms,Ref,Parent);
-%      H =< 100 ->
-%        spawn(fun() ->
-%                  Parent ! {Ref, catch solve_one_seq(Ms)}
-%              end),
-%        p_solve_one_limit([],Ref,Parent)
-%   end.
-% p_solve_one_limit(Ms) ->
-%   Ref = make_ref(),
-%   Parent = self(),
-%   p_solve_one_limit(Ms,Ref,Parent).
-
-%p_solve_one([],Ref,_,_) ->
-%  wait_for_solution(Ref);
-%p_solve_one([M|Ms],Ref,Parent,Method) ->
-%  spawn(fun() ->
-%            Parent ! {Ref, catch solve_refined(M,Method)}
-%        end),
-%  p_solve_one(Ms,Ref,Parent,Method).
-%p_solve_one(Ms,Method) ->
-%  Ref = make_ref(),
-%  Parent = self(),
-%  p_solve_one(Ms,Ref,Parent,Method).
 
 wait_for_solution(Ref) ->
   receive
@@ -435,26 +380,11 @@ benchmarks() ->
   timer:tc(?MODULE,benchmarks,[Puzzles]).
 
 benchmark(Puzzles) ->
-  [{seventeen,bm(fun() -> solve(M) end)} || {seventeen,M} <- Puzzles].
+  [{challenge1,bm(fun() -> solve(M) end)} || {challenge1,M} <- Puzzles].
 
 benchmark() ->
   {ok,Puzzles} = file:consult("problems.txt"),
   timer:tc(?MODULE,benchmark,[Puzzles]).
-
-% Method is one of sequential, par_rows, par_blocks or par_guesses
-benchmark_one(Method, Problem) ->
-  case Method of
-    sequential  -> io:format("sequential run~n");
-    par_rows    -> io:format("parallel rows~n");
-    par_blocks  -> io:format("parallel blocks~n");
-    par_guesses -> io:format("parallel guesses~n");
-    _           -> io:format("unknown method, use one of:~nsequential," ++
-                             " par_rows, par_blocks or par_guesses~n"),
-                   exit(unknown_metod)
-  end,
-  {ok,Puzzles} = file:consult("problems.txt"),
-  {_,Puzzle} = hd(lists:filter(fun({Name,_}) -> Name == Problem end,Puzzles)),
-  timer:tc(?MODULE,solve,[Puzzle,Method]).
 
 p_benchmarks([{Name,M}]) -> [{Name,bm(fun() -> solve(M) end)}];
 p_benchmarks([{Name,M}|Puzzles]) ->
