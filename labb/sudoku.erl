@@ -92,7 +92,7 @@ fill(M) ->
 %      refine(M)
 %  end.
 
-orig_refine(M) ->
+refine(M) ->
   NewM =
   refine_rows(
     transpose(
@@ -108,7 +108,7 @@ orig_refine(M) ->
   end.
 
 
-refine(M) ->
+p_block_refine(M) ->
   flush(),
   Parent = self(),
   BlockRef = make_ref(),
@@ -275,7 +275,7 @@ guesses(M) ->
     [{hard(NewM),NewM}
      || NewM <- Ms,
         not is_exit(NewM)]),
-  [G || {_,G} <- SortedGuesses].
+  [{H,G} || {H,G} <- SortedGuesses].
 
 %guesses(M,Method) ->
 %  {I,J,Guesses} = guess(M),
@@ -341,41 +341,62 @@ solve_refined(M) ->
 %      end
 %  end.
 
-solve_one([]) ->
+solve_one_seq([]) ->
   exit(no_solution);
-solve_one([M]) ->
+solve_one_seq([{_,M}]) ->
+  % io:format("~p~n",[H]),
   solve_refined(M);
-solve_one([M|Ms]) ->
+solve_one_seq([{_,M}|Ms]) ->
   case catch solve_refined(M) of
     {'EXIT',no_solution} ->
-      solve_one(Ms);
+      % io:format("~p~n",[H]),
+      solve_one_seq(Ms);
     Solution ->
       Solution
   end.
 
-%solve_one([],_) ->
-%  exit(no_solution);
-%solve_one([M],Method) ->
-%  solve_refined(M,Method);
-%solve_one([M|Ms],Method) ->
-%  case catch solve_refined(M,Method) of
-%    {'EXIT',no_solution} ->
-%      solve_one(Ms,Method);
-%    Solution ->
-%      Solution
-%  end.
+solve_one([]) ->
+  exit(no_solution);
+solve_one([{_,M}]) ->
+  solve_refined(M);
+solve_one([{_,M}|Ms]) ->
+  case catch solve_refined(M) of
+    {'EXIT',no_solution} ->
+      solve_one_seq(Ms);
+    Solution ->
+      Solution
+  end.
 
-p_solve_one([],Ref,_) ->
-  wait_for_solution(Ref);
-p_solve_one([M|Ms],Ref,Parent) ->
-  spawn(fun() ->
-            Parent ! {Ref, catch solve_refined(M)}
-        end),
-  p_solve_one(Ms,Ref,Parent).
-p_solve_one(Ms) ->
-  Ref = make_ref(),
-  Parent = self(),
-  p_solve_one(Ms,Ref,Parent).
+% solve_one([],Ref,_) ->
+%   wait_for_solution(Ref);
+% solve_one([{_,M}|Ms],Ref,Parent) ->
+%   spawn(fun() ->
+%             Parent ! {Ref, catch solve_refined(M)}
+%         end),
+%        solve_one(Ms,Ref,Parent).
+% solve_one(Ms) ->
+%   Ref = make_ref(),
+%   Parent = self(),
+%   solve_one(Ms,Ref,Parent).
+
+% p_solve_one_limit([],Ref,_) ->
+%   wait_for_solution(Ref);
+% p_solve_one_limit([{H,M}|Ms],Ref,Parent) ->
+%   spawn(fun() ->
+%             Parent ! {Ref, catch solve_refined(M)}
+%         end),
+%   if H > 100 ->
+%        p_solve_one_limit(Ms,Ref,Parent);
+%      H =< 100 ->
+%        spawn(fun() ->
+%                  Parent ! {Ref, catch solve_one_seq(Ms)}
+%              end),
+%        p_solve_one_limit([],Ref,Parent)
+%   end.
+% p_solve_one_limit(Ms) ->
+%   Ref = make_ref(),
+%   Parent = self(),
+%   p_solve_one_limit(Ms,Ref,Parent).
 
 %p_solve_one([],Ref,_,_) ->
 %  wait_for_solution(Ref);
@@ -397,7 +418,7 @@ wait_for_solution(Ref) ->
 
 %% benchmarks
 
--define(EXECUTIONS,10).
+-define(EXECUTIONS,1).
 
 bm(F) ->
   {T,_} = timer:tc(?MODULE,repeat,[F]),
@@ -414,7 +435,7 @@ benchmarks() ->
   timer:tc(?MODULE,benchmarks,[Puzzles]).
 
 benchmark(Puzzles) ->
-  [{challenge1,bm(fun() -> solve(M) end)} || {challenge1,M} <- Puzzles].
+  [{seventeen,bm(fun() -> solve(M) end)} || {seventeen,M} <- Puzzles].
 
 benchmark() ->
   {ok,Puzzles} = file:consult("problems.txt"),
