@@ -19,6 +19,23 @@ executable labc
   -- main-is:             
   -- other-modules:       
   -- other-extensions:    
-  build-depends:       base >=4.6 && <4.7
+  build-depends:      base >=4.6 && <4.7
+                      , repa
   -- hs-source-dirs:      
+  ghc-options:          -O2 -threaded -rtsopts -eventlog
+  default-language:     Haskell2010
+executable laba
+  main-is:             LabA.hs
+  -- other-modules:       
+  -- other-extensions:    
+  build-depends:       base >=4.6 && <4.7
+                       , normaldistribution
+                       , criterion
+                       , monad-par
+                       , random
+                       , array
+                       , parallel
+                       , deepseq
+  -- hs-source-dirs:      
+  ghc-options:         -O2 -threaded -rtsopts -eventlog
   default-language:    Haskell2010
