@@ -44,27 +44,25 @@ buySellSeq' s p (x:xs)
 -------------
 
 interleave :: [Int] -> [Int] -> [Int]
-interleave []     xs = xs
-interleave (x:xs) ys = x : interleave ys xs
+interleave [] xs = xs
+interleave (x:xs) ys = x:interleave ys xs
 
-evens :: [Int] -> [Int]
-evens [] = []
-evens [_] = []
-evens (_:x:xs) = x : evens xs
 
 odds :: [Int] -> [Int]
+odds (_:x:xs) = x:odds xs
+odds (_:xs) = odds xs
 odds [] = []
-odds [x] = [x]
-odds (x:_:xs) = x : odds xs
+
+evens :: [Int] -> [Int]
+evens (x:_:xs) = x:evens xs
+evens (x:xs) = x:evens xs
+evens [] = []
 
 scanOp :: (Int -> Int -> Int) -> Int -> [Int] -> [Int]
---scanOp op ident as = ident:scanOp' op ident as
-scanOp = scanOp'
-
-scanOp' :: (Int -> Int -> Int) -> Int -> [Int] -> [Int]
-scanOp' _ ident [] = [ident]
-scanOp' op ident as = let
+scanOp _ ident [_] = [ident]
+scanOp op ident as = let
     e = evens as
     o = odds as
-    s = scanOp' op ident $ Prelude.zipWith op e o
+    s = scanOp op ident $ Prelude.zipWith op e o
   in interleave s $ Prelude.zipWith op s e
+
