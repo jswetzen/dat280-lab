@@ -7,8 +7,8 @@ synopsis:            Parallelizing Stockmarket Problem with the par monad.
 -- description:         
 license:             MIT
 license-file:        LICENSE
-author:              Sebastian Lagermann
-maintainer:          seblag@student.chalmers.se
+author:              Sebastian Lagermann and Johan Swetzen
+maintainer:          seblag@student.chalmers.se and swetzen@student.chalmers.se
 -- copyright:           
 category:            Concurrency
 build-type:          Simple
@@ -21,6 +21,7 @@ executable labc
   -- other-extensions:    
   build-depends:      base >=4.6 && <4.7
                       , repa
+                      , criterion
   -- hs-source-dirs:      
   ghc-options:          -O2 -threaded -rtsopts -eventlog
   default-language:     Haskell2010
