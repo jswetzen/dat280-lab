@@ -36,22 +36,27 @@ buySellSeq' s p (x:xs)
       (bVal, _) = buy s
 
 interleave :: [Int] -> [Int] -> [Int]
-interleave []     []      = []
-interleave (x:xs) (y:ys)  = x:y:interleave xs ys
-interleave _      _       = error "Lists must have the same lenght"
+interleave []     xs = xs
+interleave (x:xs) ys = x : interleave ys xs
 
 evens :: [Int] -> [Int]
-evens = filter even
+evens [] = []
+evens [_] = []
+evens (_:x:xs) = x : evens xs
 
 odds :: [Int] -> [Int]
-odds = filter odd
+odds [] = []
+odds [x] = [x]
+odds (x:_:xs) = x : odds xs
 
 scanOp :: (Int -> Int -> Int) -> Int -> [Int] -> [Int]
-scanOp op ident as = ident:scanOp' op ident as
+--scanOp op ident as = ident:scanOp' op ident as
+scanOp = scanOp'
 
 scanOp' :: (Int -> Int -> Int) -> Int -> [Int] -> [Int]
+scanOp' _ ident [] = [ident]
 scanOp' op ident as = let
     e = evens as
     o = odds as
-    s = scanOp op ident [ op a b | a <- e, b <- o]
-  in interleave s [ op a b | a <- s, b <- e]
+    s = scanOp' op ident $ Prelude.zipWith op e o
+  in interleave s $ Prelude.zipWith op s e
