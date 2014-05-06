@@ -40,7 +40,7 @@ buySellSeq' s p (x:xs)
       (bVal, _) = buy s
 
 -------------
--- Try One --
+-- Try Two --
 -------------
 
 interleave :: [Int] -> [Int] -> [Int]
