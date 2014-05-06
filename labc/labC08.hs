@@ -17,6 +17,10 @@ exampleProblem = fromListUnboxed (Z :. (8::Int)) [0,0,2,9,8,10,1,10]
 -- Sequential --
 ----------------
 
+-------------
+-- Try One --
+-------------
+
 buySellSeq :: Array U DIM1 Int -> (Int, Int, Int)
 buySellSeq arr = buySellSeq' state 1 lst
   where (x:lst) = toList arr
@@ -34,6 +38,10 @@ buySellSeq' s p (x:xs)
       (mVal, _) = mini s
       (sVal, _) = sell s
       (bVal, _) = buy s
+
+-------------
+-- Try One --
+-------------
 
 interleave :: [Int] -> [Int] -> [Int]
 interleave []     xs = xs
