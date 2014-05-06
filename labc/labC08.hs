@@ -13,6 +13,10 @@ data State = State { buy :: (Int, Int) -- (value, position)
 exampleProblem :: Array U DIM1 Int
 exampleProblem = fromListUnboxed (Z :. (8::Int)) [0,0,2,9,8,10,1,10]
 
+----------------
+-- Sequential --
+----------------
+
 buySellSeq :: Array U DIM1 Int -> (Int, Int, Int)
 buySellSeq arr = buySellSeq' state 1 lst
   where (x:lst) = toList arr
