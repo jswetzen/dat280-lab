@@ -16,7 +16,6 @@
 *dist/
 
 # Windows
-*.bat
 *output
 
 # Erlang
