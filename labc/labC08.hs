@@ -9,9 +9,11 @@ data State = State { buy :: (Int, Int) -- (value, position)
                    , mini :: (Int, Int)
                    } deriving (Show)
 
+exampleList :: [Int]
+exampleList = [0,0,2,9,8,10,1,10]
 -- Applying buySell should produce (1,5,10)
 exampleProblem :: Array U DIM1 Int
-exampleProblem = fromListUnboxed (Z :. (8::Int)) [0,0,2,9,8,10,1,10]
+exampleProblem = fromListUnboxed (Z :. (8::Int)) exampleList
 
 ----------------
 -- Sequential --
@@ -43,22 +45,22 @@ buySellSeq' s p (x:xs)
 -- Try Two --
 -------------
 
-interleave :: [Int] -> [Int] -> [Int]
+interleave :: [a] -> [a] -> [a]
 interleave [] xs = xs
 interleave (x:xs) ys = x:interleave ys xs
 
 
-odds :: [Int] -> [Int]
+odds :: [a] -> [a]
 odds (_:x:xs) = x:odds xs
 odds (_:xs) = odds xs
 odds [] = []
 
-evens :: [Int] -> [Int]
+evens :: [a] -> [a]
 evens (x:_:xs) = x:evens xs
 evens (x:xs) = x:evens xs
 evens [] = []
 
-scanOp :: (Int -> Int -> Int) -> Int -> [Int] -> [Int]
+scanOp :: (a -> a -> a) -> a -> [a] -> [a]
 scanOp _ ident [_] = [ident]
 scanOp op ident as = let
     e = evens as
@@ -66,3 +68,7 @@ scanOp op ident as = let
     s = scanOp op ident $ Prelude.zipWith op e o
   in interleave s $ Prelude.zipWith op s e
 
+buySellSeq'' :: [Int] -> Int
+buySellSeq'' as = maximum $ Prelude.zipWith (-) as minscan
+  where
+    minscan = scanOp min maxBound as
