@@ -1,8 +1,15 @@
+{-# LANGUAGE TypeOperators #-}
 module Main where
 import Data.Array.Repa as R
 
 main :: IO ()
-main = print "hii"
+main = print "hii ^^"
+-- main = do
+  -- res <- foldAllP foldFun foldBase exampleProblem'
+  -- print res
+
+-- solutionTest :: Monad m => m (BuySell, Min, Current)
+-- solutionTest = foldAllP foldFun foldBase exampleProblem'
 
 data State = State { buy :: (Int, Int) -- (value, position)
                    , sell :: (Int, Int)
@@ -14,6 +21,13 @@ exampleList = [0,0,2,9,8,10,1,10]
 -- Applying buySell should produce (1,5,10)
 exampleProblem :: Array U DIM1 Int
 exampleProblem = fromListUnboxed (Z :. (8::Int)) exampleList
+
+-- [((buy_pos, sell_pos), (min_val, min_pos), (pos, profit))]
+-- exIds :: [(BuySell, Min, Current)]
+-- exIds = zip3 (zip (repeat 0) (repeat 0)) (zip (repeat 0) (repeat 0)) (zip [0..] exampleList)
+
+-- exampleProblem' :: Array U DIM1 (BuySell, Min, Current)
+-- exampleProblem' = fromListUnboxed (Z :. (8::Int)) exIds
 
 ----------------
 -- Sequential --
@@ -45,6 +59,38 @@ buySellSeq' s p (x:xs)
 -- Try Two --
 -------------
 
+-- type BuySell = (Int, Int)
+-- type Min = (Int, Int)
+-- type Current = (Int, Int) -- current
+
+-- -- [((buy_pos, sell_pos), (min_val, min_pos), (pos, profit))]
+-- exIdsFun :: [Int] -> [(BuySell, Min, Current)]
+-- exIdsFun xs = zip3 (zip (repeat 0) (repeat 0)) (zip (repeat 0) (repeat 0)) (zip [0..] xs)
+
+-- foldBase :: (BuySell, Min, Current)
+-- foldBase = ((0, 0), (0, 0), (0, 0))
+
+-- foldBaseArr :: Array U DIM1 (BuySell, Min, Current) -> (BuySell, Min, Current)
+-- foldBaseArr arr = arr ! (Z :. 0)
+
+-- foldFun :: (BuySell, Min, Current) ->
+--            (BuySell, Min, Current) ->
+--            (BuySell, Min, Current)
+-- foldFun a1@(_, _, (pos, _))
+--         a2@(_, _, (pos1, _)) =
+--   if pos > pos1
+--   then foldFunOrd a2 a1
+--   else foldFunOrd a1 a2
+
+-- foldFunOrd :: (BuySell, Min, Current) ->
+--               (BuySell, Min, Current) ->
+--               (BuySell, Min, Current)
+-- foldFunOrd ((bp, sp), (mv, mp), (_, prof))
+--         ((_, _), (_, _), (cpos, cval))
+--   | (cval-mv) > prof = ((mp,cpos), (mv,mp), (cpos,cval-mv))
+--   | cval <= mv = ((bp,sp), (cval,cpos), (cpos,prof))
+--   | otherwise = ((bp,sp), (mv,mp), (cpos,prof))
+
 interleave :: [a] -> [a] -> [a]
 interleave [] xs = xs
 interleave (x:xs) ys = x:interleave ys xs
@@ -73,28 +119,30 @@ buySellSeq'' as = maximum $ Prelude.zipWith (-) as minscan
   where
     minscan = scanOp min maxBound as
 
-type BuySell = (Int, Int)
-type Min = (Int, Int)
-type Current = (Int, Int) -- current
 
--- [((buy_pos, sell_pos), (min_val, min_pos), (pos, profit))]
-exIds :: [(BuySell, Min, Current)]
-exIds = zip3 (zip (repeat 0) (repeat 0)) (zip (repeat 0) (repeat 0)) (zip [0..] exampleList)
+pairwiseAdd :: Array U DIM1 Int -> Array D DIM1 Int
+pairwiseAdd arr = traverse arr halfsize indexfun
+  where halfsize (Z :. i) = Z :. i `div` 2
+        indexfun ixf (Z :. i) = ixf (ix1 (2*i)) + ixf (ix1 $ 2*i+1)
 
-exIdsFun :: [Int] -> [(BuySell, Min, Current)]
-exIdsFun xs = zip3 (zip (repeat 0) (repeat 0)) (zip (repeat 0) (repeat 0)) (zip [0..] xs)
+evensP :: (Shape sh) => Array D (sh :. Int) a -> Array D (sh :. Int) a
+evensP = undefined
 
-foldBase :: (BuySell, Min, Current)
-foldBase = ((0, 0), (0, 0), (0, 0))
+oddsP :: (Shape sh) => Array D (sh :. Int) a -> Array D (sh :. Int) a
+oddsP = undefined
 
-foldFun :: (BuySell, Min, Current) ->
-           (BuySell, Min, Current) ->
-           (BuySell, Min, Current)
-foldFun ((bp, sp), (mv, mp), (_, prof))
-        ((_, _), (_, _), (cpos, cval))
-  | (cval-mv) > prof = ((mp,cpos), (mv,mp), (cpos,cval-mv))
-  | cval <= mv = ((bp,sp), (cval,cpos), (cpos,prof))
-  | otherwise = ((bp,sp), (mv,mp), (cpos,prof))
+scanOpP :: (Shape sh) =>
+  (a -> a -> a) -> a ->
+  Array D (sh :. Int) a ->
+  Array D (sh :. Int) a
+scanOpP op ident as =
+  if size (extent as) == 1
+  then fromFunction unitDim (const ident)
+  else let
+    e = evensP as
+    o = oddsP as
+    s = scanOpP op ident $ R.zipWith op e o
+  in interleave2 s $ R.zipWith op s e
 
 
 
