@@ -72,3 +72,30 @@ buySellSeq'' :: [Int] -> Int
 buySellSeq'' as = maximum $ Prelude.zipWith (-) as minscan
   where
     minscan = scanOp min maxBound as
+
+type BuySell = (Int, Int)
+type Min = (Int, Int)
+type Current = (Int, Int) -- current
+
+-- [((buy_pos, sell_pos), (min_val, min_pos), (pos, profit))]
+exIds :: [(BuySell, Min, Current)]
+exIds = zip3 (zip (repeat 0) (repeat 0)) (zip (repeat 0) (repeat 0)) (zip [0..] exampleList)
+
+exIdsFun :: [Int] -> [(BuySell, Min, Current)]
+exIdsFun xs = zip3 (zip (repeat 0) (repeat 0)) (zip (repeat 0) (repeat 0)) (zip [0..] xs)
+
+foldBase :: (BuySell, Min, Current)
+foldBase = ((0, 0), (0, 0), (0, 0))
+
+foldFun :: (BuySell, Min, Current) ->
+           (BuySell, Min, Current) ->
+           (BuySell, Min, Current)
+foldFun ((bp, sp), (mv, mp), (_, prof))
+        ((_, _), (_, _), (cpos, cval))
+  | (cval-mv) > prof = ((mp,cpos), (mv,mp), (cpos,cval-mv))
+  | cval <= mv = ((bp,sp), (cval,cpos), (cpos,prof))
+  | otherwise = ((bp,sp), (mv,mp), (cpos,prof))
+
+
+
+
