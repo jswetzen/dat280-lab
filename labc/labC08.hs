@@ -169,7 +169,7 @@ zipTuple _ _ _ = []
 
 -- The tuple type is meant to describe the buy position, sell position and the
 -- max profit outcome.
-newtype Tuple = T (Int, Int, Int) deriving (Eq,Show)
+newtype Tuple = T (Int, Int, Int) deriving Eq
 instance Ord Tuple where
   T (_,_,c1) `compare` T (_,_,c2) = c1 `compare` c2
   T (_,_,c1) >  T (_,_,c2) = c1 > c2
@@ -183,3 +183,5 @@ instance Ord Tuple where
                                                    then first
                                                    else second
 
+instance Show Tuple where
+  showsPrec p (T x) = showsPrec p x
