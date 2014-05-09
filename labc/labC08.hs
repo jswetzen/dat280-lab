@@ -159,5 +159,27 @@ maximumP :: Array D DIM1 Int -> Int
 maximumP arr = fromJust $ foldAllP max (arr ! (Z :. 0)) arr
 
 
+exampleList2 :: [Tuple]
+exampleList2 = zipTuple ([0..] :: [Int]) ([0..] :: [Int]) exampleList
 
+zipTuple :: [Int] -> [Int] -> [Int] -> [Tuple]
+zipTuple [] [] [] = []
+zipTuple (a:as) (b:bs) (c:cs) = T (a,b,c) : zipTuple as bs cs
+zipTuple _ _ _ = []
+
+-- The tuple type is meant to describe the buy position, sell position and the
+-- max profit outcome.
+newtype Tuple = T (Int, Int, Int) deriving (Eq,Show)
+instance Ord Tuple where
+  T (_,_,c1) `compare` T (_,_,c2) = c1 `compare` c2
+  T (_,_,c1) >  T (_,_,c2) = c1 > c2
+  T (_,_,c1) >= T (_,_,c2) = c1 >= c2
+  T (_,_,c1) <  T (_,_,c2) = c1 < c2
+  T (_,_,c1) <= T (_,_,c2) = c1 <= c2
+  first@(T (_,_,c1)) `max` second@(T (_,_,c2)) = if c1 == max c1 c2
+                                                   then first
+                                                   else second
+  first@(T (_,_,c1)) `min` second@(T (_,_,c2)) = if c1 == min c1 c2
+                                                   then first
+                                                   else second
 
