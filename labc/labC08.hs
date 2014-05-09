@@ -1,6 +1,7 @@
 {-# LANGUAGE TypeOperators #-}
 module Main where
 import Data.Array.Repa as R
+import Data.Maybe as M
 
 main :: IO ()
 main = print "hii ^^"
@@ -125,24 +126,37 @@ pairwiseAdd arr = traverse arr halfsize indexfun
   where halfsize (Z :. i) = Z :. i `div` 2
         indexfun ixf (Z :. i) = ixf (ix1 (2*i)) + ixf (ix1 $ 2*i+1)
 
-evensP :: (Shape sh) => Array D (sh :. Int) a -> Array D (sh :. Int) a
-evensP = undefined
+everyOther :: ((DIM1 -> a) -> DIM1 -> a) -> Array D DIM1 a -> Array D DIM1 a
+everyOther fun arr = traverse arr halfsize fun
+  where halfsize (Z :. i) = Z :. i `div` 2
 
-oddsP :: (Shape sh) => Array D (sh :. Int) a -> Array D (sh :. Int) a
-oddsP = undefined
+evensFun :: (DIM1 -> a) -> DIM1 -> a
+evensFun ixf (Z :. i) = ixf (ix1 (2*i))
 
-scanOpP :: (Shape sh) =>
-  (a -> a -> a) -> a ->
-  Array D (sh :. Int) a ->
-  Array D (sh :. Int) a
+oddsFun :: (DIM1 -> a) -> DIM1 -> a
+oddsFun ixf (Z :. i) = ixf (ix1 (2*i+1))
+
+scanOpP :: (a -> a -> a) -> a ->
+  Array D DIM1 a ->
+  Array D DIM1 a
 scanOpP op ident as =
   if size (extent as) == 1
   then fromFunction unitDim (const ident)
   else let
-    e = evensP as
-    o = oddsP as
+    e = everyOther evensFun as
+    o = everyOther oddsFun as
     s = scanOpP op ident $ R.zipWith op e o
   in interleave2 s $ R.zipWith op s e
+
+buySellP :: Array D DIM1 Int -> Int
+buySellP arr = maximumP $ R.zipWith (-) arr minscan
+  where
+    minscan = scanOpP min (arr ! (Z :. 0)) $ delay arr
+
+-- fromJust is potentially unsafe, but should always give an answer
+-- And, we like to live dangerously
+maximumP :: Array D DIM1 Int -> Int
+maximumP arr = fromJust $ foldAllP max (arr ! (Z :. 0)) arr
 
 
 
