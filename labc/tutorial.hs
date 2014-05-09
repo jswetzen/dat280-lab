@@ -8,11 +8,12 @@ import Criterion.Main
 benchTasks :: IO ()
 benchTasks = do
   seed <- newStdGen
-  let rl = randomlist 10 seed
-  let qs = bgroup "Quicksort" [bench "Sequential" (nf qsort rl)
+  let rl = randomlist 1000 seed
+      qs = bgroup "Quicksort" [bench "Sequential" (nf qsort rl)
                               ,bench "Parallel" (nf pqsort rl)
                               ,bench "Parallel with depth" (nf (pqsort2 5) rl)]
-  print rl
+  --print rl
+  defaultMain [qs]
 
 randomlist :: Int -> StdGen -> [Int]
 randomlist n = take n . unfoldr (Just . random)
@@ -32,7 +33,6 @@ pqsort (x:xs) = runPar $ do
   l <- get lesser
   g <- get greater
   return $ l ++ [x] ++ g
-
 
 pqsort2 :: (NFData a, Ord a) => Int -> [a] -> [a]
 pqsort2 _ [] = []
