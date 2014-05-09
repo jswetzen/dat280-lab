@@ -22,11 +22,14 @@ executable labc
   build-depends:      base >=4.6 && <4.7
                       , repa
                       , criterion
-                      , llvm
+                      , monad-par
+                      , random
+                      , criterion
   -- hs-source-dirs:      
-  ghc-options:          -Odph -rtsopts -threaded -fno-liberate-case
-                        -funfolding-use-threshold1000
-                        -funfolding-keeness-factor1000 -fllvm -optlo-O3
-                        -- -O2 -threaded -rtsopts -eventlog
+  ghc-options:          -O2 -threaded -rtsopts -eventlog
+                        -- -Odph -rtsopts -threaded -fno-liberate-case
+                        -- -funfolding-use-threshold1000
+                        -- -funfolding-keeness-factor1000 -fllvm -optlo-O3
+                        
   default-language:     Haskell2010
   main-is:              labC08.hs
