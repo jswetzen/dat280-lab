@@ -31,3 +31,21 @@ executable labc
                         -- -funfolding-keeness-factor1000 -fllvm -optlo-O3
   default-language:     Haskell2010
   main-is:              labC08.hs
+
+executable tutorial
+  -- main-is:
+  -- other-modules:
+  -- other-extensions:
+  build-depends:      base >=4.6 && <4.7
+                      , repa
+                      , criterion
+                      , monad-par
+                      , random
+                      , criterion
+  -- hs-source-dirs:      
+  ghc-options:          -O2 -threaded -rtsopts -eventlog
+                        -- -Odph -rtsopts -threaded -fno-liberate-case
+                        -- -funfolding-use-threshold1000
+                        -- -funfolding-keeness-factor1000 -fllvm -optlo-O3
+  default-language:     Haskell2010
+  main-is:              tutorial.hs
