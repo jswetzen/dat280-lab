@@ -1,23 +1,17 @@
 {-# LANGUAGE TypeOperators #-}
+
 module Main where
+
 import System.Random
 import Data.List
 import Data.Array.Repa as R
 import Data.Array.Repa.Repr.Unboxed
 import Data.Maybe as M
 import Criterion.Main
--- import Control.DeepSeq
 
 
 main :: IO ()
 main = benchTasks
--- main = do
---   let seed = mkStdGen 12934871823479128347
---       len = 10000
---       rs = randomlist len seed
---       arr = arrTup len rs
---       lst = listTup rs
---   print . buySellP $ delay arr
 
 benchTasks :: IO ()
 benchTasks = do
@@ -31,16 +25,8 @@ benchTasks = do
         ,bench "Seqential" (nf buySellSeq'' lst)]
   defaultMain [repa]
 
-runParallel :: Bool
-runParallel = False
-
 randomlist :: Int -> StdGen -> [Int]
 randomlist n = take n . unfoldr (Just . random)
-
-data State = State { buy :: (Int, Int) -- (value, position)
-                   , sell :: (Int, Int)
-                   , mini :: (Int, Int)
-                   } deriving (Show)
 
 exampleList :: [Int]
 exampleList = [0,0,2,9,8,10,1,10]
@@ -56,7 +42,6 @@ listTup :: [Int] -> [(Int, Int, Int)]
 listTup = Prelude.zip3 ixs ixs
   where ixs = [0..]::[Int]
 
-
 arrTup :: Int -> [Int] -> Array U (Z :. Int) (Int, Int, Int)
 arrTup len = fromListUnboxed (Z :. (len::Int)) . listTup
 
@@ -67,6 +52,11 @@ arrTup len = fromListUnboxed (Z :. (len::Int)) . listTup
 -------------
 -- Try One --
 -------------
+
+data State = State { buy :: (Int, Int) -- (value, position)
+                   , sell :: (Int, Int)
+                   , mini :: (Int, Int)
+                   } deriving (Show)
 
 buySellSeq :: Array U DIM1 Int -> (Int, Int, Int)
 buySellSeq arr = buySellSeq' state 1 lst
@@ -94,11 +84,13 @@ interleave :: [a] -> [a] -> [a]
 interleave [] xs = xs
 interleave (x:xs) ys = x:interleave ys xs
 
+-- | returns the a list with only the odd indices values
 odds :: [a] -> [a]
 odds (_:x:xs) = x:odds xs
 odds (_:xs) = odds xs
 odds [] = []
 
+-- | returns an array that only contains the even indices values of a list
 evens :: [a] -> [a]
 evens (x:_:xs) = x:evens xs
 evens (x:xs) = x:evens xs
