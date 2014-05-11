@@ -5,27 +5,24 @@ import Data.List
 import Data.Array.Repa as R
 import Data.Array.Repa.Repr.Unboxed
 import Data.Maybe as M
-import System.Environment
 import Criterion.Main
+-- import Control.DeepSeq
 
 
 main :: IO ()
 main = benchTasks
---main = do
---  args <- getArgs
---  let seed = mkStdGen 12934871823479128347
---      len = 20000
---      rs = randomlist len seed
---      arr = arrTup len rs
---      lst = listTup rs
---  case args of
---    ["-par"] -> print $ buySellP $ delay arr
---    _        -> print $ buySellSeq'' lst
+-- main = do
+--   let seed = mkStdGen 12934871823479128347
+--       len = 10000
+--       rs = randomlist len seed
+--       arr = arrTup len rs
+--       lst = listTup rs
+--   print . buySellP $ delay arr
 
 benchTasks :: IO ()
 benchTasks = do
   let seed = mkStdGen 12934871823479128347
-      len = 20000
+      len = 10000
       rs = randomlist len seed
       arr = arrTup len rs
       lst = listTup rs
@@ -179,4 +176,66 @@ max' t1@(_, s1, p1) t2@(_, s2, p2)
 -- And, we like to live dangerously
 maximumP :: Array D DIM1 (Int, Int, Int) -> (Int, Int, Int)
 maximumP arr = fromJust $ foldAllP max' (arr ! (Z :. 0)) arr
+
+
+-----------------------------
+-- The failed folding test --
+-----------------------------
+
+-- Sequential run of the folding solution, works with foldl but not foldr.
+-- The BuySell values and the value of the Current tuple gives
+-- the correct answer most of the time. If the first value of
+-- the list is the largest, it will give that as an answer instead.
+sequentialTest :: (BuySell, Min, Current)
+sequentialTest = foldl foldFun (head xs) xs
+  where xs = exIds exampleList
+
+-- A test of the folding solution, not working
+solutionTest :: Monad m => m (BuySell, Min, Current)
+solutionTest = foldAllP foldFun (foldBaseArr exampleProblem') exampleProblem'
+
+-- The example problem with zero buysell and min values
+exampleProblem' :: Array U DIM1 (BuySell, Min, Current)
+exampleProblem' = fromListUnboxed (Z :. (8::Int)) $ exIds exampleList
+
+type BuySell = (Int, Int) -- buy position, sell position
+type Min = (Int, Int) -- minimum price, position
+type Current = (Int, Int) -- current position, profit/price
+
+-- Fills out a list with the needed starting values
+-- [((buy_pos, sell_pos), (min_val, min_pos), (pos, profit))]
+exIds :: [Int] -> [(BuySell, Min, Current)]
+exIds xs = Prelude.zip3 zeroTup zeroTup (Prelude.zip [0..] xs)
+  where
+    zeroes = repeat 0
+    zeroTup = Prelude.zip zeroes zeroes
+
+-- Takes the first value of the array to use as a base value
+foldBaseArr :: Array U DIM1 (BuySell, Min, Current) -> (BuySell, Min, Current)
+foldBaseArr arr = arr ! (Z :. 0)
+
+-- Folds new data into the accumulated value. Since we could not use
+-- foldl and know which one is which, we tried here to assume that
+-- the one with the highest current position is being folded into the
+-- other one.
+foldFun :: (BuySell, Min, Current) ->
+           (BuySell, Min, Current) ->
+           (BuySell, Min, Current)
+foldFun a1@(_, _, (pos, _))
+        a2@(_, _, (pos1, _)) =
+  if pos > pos1
+  then foldFunOrd a2 a1
+  else foldFunOrd a1 a2
+
+-- This is an ordered version of foldFun that assumes that the first
+-- tuple is the accumulated value and the second one is the new value
+-- being added.
+foldFunOrd :: (BuySell, Min, Current) ->
+              (BuySell, Min, Current) ->
+              (BuySell, Min, Current)
+foldFunOrd ((bp, sp), (mv, mp), (_, prof))
+        ((_, _), (_, _), (cpos, cval))
+  | (cval-mv) > prof = ((mp,cpos), (mv,mp), (cpos,cval-mv))
+  | cval <= mv = ((bp,sp), (cval,cpos), (cpos,prof))
+  | otherwise = ((bp,sp), (mv,mp), (cpos,prof))
 

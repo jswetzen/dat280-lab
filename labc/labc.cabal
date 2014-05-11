@@ -24,6 +24,7 @@ executable labc
                       , criterion
                       , monad-par
                       , random
+                      , deepseq
   -- hs-source-dirs:      
   ghc-options:          -O2 -threaded -rtsopts -eventlog
                         -- -Odph -rtsopts -threaded -fno-liberate-case
