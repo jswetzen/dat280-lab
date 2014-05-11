@@ -16,11 +16,11 @@ benchTasks = do
       qs = bgroup "Quicksort"
         [bench "Sequential factorial" (nf fac 5000)
         ,bench "Parallel factorial" (nf facP 5000)
-        ,bench "Sequential" (nf qsort rl)
+ {-       ,bench "Sequential" (nf qsort rl)
         ,bench "Parallel" (nf pqsort (take (len `div` 5) rl))
         ,bench "Parallel with depth" (nf (runPar . pqsort2 5) rl)
         ,bench "Parallel with fork" (nf (runPar . pqsort3) (take (len `div` 5) rl))
-        ,bench "Parallel with fork and depth" (nf (runPar . pqsort4 5) rl)]
+        ,bench "Parallel with fork and depth" (nf (runPar . pqsort4 5) rl)-}]
   defaultMain [qs]
 
 randomlist :: Int -> StdGen -> [Int]

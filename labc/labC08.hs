@@ -6,18 +6,33 @@ import Data.Array.Repa as R
 import Data.Array.Repa.Repr.Unboxed
 import Data.Maybe as M
 import System.Environment
+import Criterion.Main
+
 
 main :: IO ()
-main = do
-  args <- getArgs
+main = benchTasks
+--main = do
+--  args <- getArgs
+--  let seed = mkStdGen 12934871823479128347
+--      len = 20000
+--      rs = randomlist len seed
+--      arr = arrTup len rs
+--      lst = listTup rs
+--  case args of
+--    ["-par"] -> print $ buySellP $ delay arr
+--    _        -> print $ buySellSeq'' lst
+
+benchTasks :: IO ()
+benchTasks = do
   let seed = mkStdGen 12934871823479128347
       len = 20000
       rs = randomlist len seed
       arr = arrTup len rs
       lst = listTup rs
-  case args of
-    ["-par"] -> print $ buySellP $ delay arr
-    _        -> print $ buySellSeq'' lst
+      repa = bgroup "Repa"
+        [bench "Parallel" (nf buySellP $ delay arr)
+        ,bench "Seqential" (nf buySellSeq'' lst)]
+  defaultMain [repa]
 
 runParallel :: Bool
 runParallel = False
@@ -43,6 +58,7 @@ exampleProblem = fromListUnboxed (Z :. (8::Int)) exampleListTup
 listTup :: [Int] -> [(Int, Int, Int)]
 listTup = Prelude.zip3 ixs ixs
   where ixs = [0..]::[Int]
+
 
 arrTup :: Int -> [Int] -> Array U (Z :. Int) (Int, Int, Int)
 arrTup len = fromListUnboxed (Z :. (len::Int)) . listTup
