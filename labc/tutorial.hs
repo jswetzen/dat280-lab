@@ -11,16 +11,17 @@ main = benchTasks
 benchTasks :: IO ()
 benchTasks = do
   seed <- newStdGen
-  let len = 5000
+  let len = 500000
       rl = randomlist len seed
+      fa = bgroup "Factorial"
+        [bench "Sequential" (nf fac 5000)
+        ,bench "Parallel" (nf facP 5000)]
       qs = bgroup "Quicksort"
-        [bench "Sequential factorial" (nf fac 5000)
-        ,bench "Parallel factorial" (nf facP 5000)
- {-       ,bench "Sequential" (nf qsort rl)
+        [bench "Sequential" (nf qsort rl)
         ,bench "Parallel" (nf pqsort (take (len `div` 5) rl))
-        ,bench "Parallel with depth" (nf (runPar . pqsort2 5) rl)
-        ,bench "Parallel with fork" (nf (runPar . pqsort3) (take (len `div` 5) rl))
-        ,bench "Parallel with fork and depth" (nf (runPar . pqsort4 5) rl)-}]
+        ,bench "Parallel with depth" (nf (runPar . pqsort2 5) rl)]
+        -- ,bench "Parallel with fork" (nf (runPar . pqsort3) (take (len `div` 5) rl))
+        -- ,bench "Parallel with fork and depth" (nf (runPar . pqsort4 5) rl)]
   defaultMain [qs]
 
 randomlist :: Int -> StdGen -> [Int]
@@ -109,10 +110,9 @@ qsort (x:xs) = qsort lesser ++ [x] ++ qsort greater
 pqsort :: (NFData a, Ord a) => [a] -> [a]
 pqsort [] = []
 pqsort (x:xs) = runPar $ do
-  lesser <- spawn $ return $ pqsort $ filter (< x) xs
-  greater <- spawn $ return $ pqsort $ filter (>= x) xs
-  l <- get lesser
-  g <- get greater
+  lesser <- spawnP . pqsort $ filter (< x) xs
+  greater <- spawnP . pqsort $ filter (>= x) xs
+  [l,g] <- mapM get [lesser, greater]
   return $ l ++ [x] ++ g
 
 pqsort2 :: (NFData a, Ord a) => Int -> [a] -> Par [a]
