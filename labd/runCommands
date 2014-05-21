@@ -1,0 +1,4 @@
+erl -sname nodeName1
+c(module).
+nl(module).
+rpc:call('nodeName2',module,function,[Parameters]).
