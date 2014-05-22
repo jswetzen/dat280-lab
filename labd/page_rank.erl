@@ -9,7 +9,7 @@
 
 map(Url,ok) ->
   [{Url,Body}] = dets:lookup(web,Url),
-  Urls = web_crawler:find_urls(Url,Body),
+  Urls = crawl:find_urls(Url,Body),
   [{U,1} || U <-Urls].
 
 reduce(Url,Ns) ->
