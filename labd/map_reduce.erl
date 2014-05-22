@@ -45,6 +45,45 @@ group(K,Vs,Rest) ->
   [{K,lists:reverse(Vs)}|group(Rest)].
 
 
+map_reduce_dist(Map,Reduce,Input) ->
+  Parent = self(),
+  Nodes = nodes(),
+  Nodes_Len = length(Nodes),
+  Splits = split_into(Nodes_Len,Input),
+  Split_Nodes = lists:zip(Splits, Nodes),
+  Mappers =
+  [remote_mapper(Parent,Map,Nodes_Len,Split,Node)
+   || {Split, Node} <-Split_Nodes],
+  Mappeds =
+  [receive {Pid,L} -> L end || Pid <-Mappers],
+  Reducers =
+  [remote_reducer(Parent,Reduce,I,Mappeds,Node)
+   || {I, Node} <-lists:zip(lists:seq(0,Nodes_Len-1), Nodes)],
+  Reduceds =
+  [receive {Pid,L} -> L end || Pid <-Reducers],
+  lists:sort(lists:flatten(Reduceds)).
+
+
+remote_mapper(Parent,Map,R,Split,Node) ->
+  rpc:call(Node,map_reduce,remote_mapper_fun,[Parent,Map,R,Split]).
+
+remote_mapper_fun(Parent,Map,R,Split) ->
+       Mapped = [{erlang:phash2(K2,R),{K2,V2}}
+                 || {K,V} <-Split,
+                    {K2,V2} <-Map(K,V)],
+       Parent !
+       {self(),group(lists:sort(Mapped))}.
+
+remote_reducer(Parent,Reduce,I,Mappeds,Node) ->
+  Inputs = [KV || Mapped <-Mappeds,
+               {J,KVs} <-Mapped,
+               I==J,
+               KV <-KVs],
+  rpc:call(Node,map_reduce,remote_reducer_fun,[Parent,Reduce,Inputs]).
+
+remote_reducer_fun(Parent,Reduce,Inputs) ->
+  Parent ! {self(),reduce_seq(Reduce,Inputs)}.
+
 map_reduce_par(Map,M,Reduce,R,Input) ->
   Parent = self(),
   Splits = split_into(M,Input),
@@ -74,25 +113,16 @@ spawn_mapper(Parent,Map,R,Split) ->
 split_into(N,L) ->
   split_into(N,L,length(L)).
 
-
 split_into(1,L,_) ->
   [L];
-
-
 split_into(N,L,Len) ->
   {Pre,Suf} = lists:split(Len div N,L),
   [Pre|split_into(N-1,Suf,Len-(Len div N))].
 
-
 spawn_reducer(Parent,Reduce,I,Mappeds) ->
-  Inputs = [KV
-
-
-            || Mapped <-Mappeds,
+  Inputs = [KV || Mapped <-Mappeds,
                {J,KVs} <-Mapped,
                I==J,
                KV <-KVs],
-
-
   spawn_link(fun() -> Parent ! {self(),reduce_seq(Reduce,Inputs)}
              end).

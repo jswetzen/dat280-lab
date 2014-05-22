@@ -26,7 +26,7 @@ follow(D,KVs) ->
 map(Url,undefined) ->
   Body = fetch_url(Url),
   [{Url,Body}] ++
-    [{U,undefined} || U <-find_urls(Url,Body)];
+    lists:sublist([{U,undefined} || U <-find_urls(Url,Body)], 10);
 map(Url,Body) ->
   [{Url,Body}].
 
