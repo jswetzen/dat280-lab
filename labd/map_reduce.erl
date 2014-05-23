@@ -44,7 +44,9 @@ group(K,Vs,[{K,V}|Rest]) ->
 group(K,Vs,Rest) ->
   [{K,lists:reverse(Vs)}|group(Rest)].
 
-% Distributed
+%%%%%%%%%%%%%%%%%%%
+%%% Distributed %%%
+%%%%%%%%%%%%%%%%%%%
 
 map_reduce_dist(Map,M,Reduce,R,Input) ->
   Parent = self(),
@@ -72,9 +74,9 @@ remote_reducer(Parent,Reduce,I,Mapped,Nodes) ->
   Node = lists:nth(Node_id+1,Nodes),
   rpc:call(Node,map_reduce,spawn_reducer,[Parent,Reduce,I,Mapped]).
 
-% end of distributed
-
-% Load-balancing Map-Reduce
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%% Load-balancing Map-Reduce %%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 map_reduce_pool(Map,M,Reduce,R,Input) ->
   Splits = split_into(M,Input),
@@ -123,9 +125,9 @@ work(Pool) ->
           {die} -> ok
   end.
 
-% end of Load-balancing Map-Reduce
-
-% Fault-tolerant Map-Reduce
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%% Fault-tolerant Map-Reduce %%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 map_reduce_ft(Map,M,Reduce,R,Input) ->
   Splits = split_into(M,Input),
@@ -192,7 +194,6 @@ work_ft(Pool) ->
   end.
 
 % End of FT MR
-
 
 map_reduce_par(Map,M,Reduce,R,Input) ->
   Parent = self(),
