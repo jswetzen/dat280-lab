@@ -76,14 +76,25 @@ remote_reducer(Parent,Reduce,I,Mapped,Nodes) ->
 
 % Load-balancing Map-Reduce
 
-map_reduce_pool(Map,M,Reduce,Input) ->
+map_reduce_pool(Map,M,Reduce,R,Input) ->
   Splits = split_into(M,Input),
-  Mappers = lists:flatten(worker_pool([fun() ->
-                             [{K2,V2}
-                              || {K,V} <- Split,
-                                 {K2,V2} <-Map(K,V)]
-               end || Split <- Splits])),
-  reduce_seq(Reduce,Mappers).
+  Mappeds = worker_pool([fun() ->
+                             Mapped = [{erlang:phash2(K2,R),{K2,V2}}
+                                       || {K,V} <- Split,
+                                          {K2,V2} <-Map(K,V)],
+                             group(lists:sort(Mapped))
+                         end || Split <- Splits]),
+  Reducers = lists:flatten(
+               worker_pool(
+                 [fun() ->
+                      In = [KV || Mapped <-Mappeds,
+                                  {J,KVs} <-Mapped,
+                                  I==J,
+                                  KV <-KVs],
+                      reduce_seq(Reduce,In)
+                  end || I <-lists:seq(0,R-1)]
+                )),
+  lists:sort(Reducers).
 
 worker_pool(Funs) ->
   Nodes = nodes(),
