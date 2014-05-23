@@ -151,8 +151,7 @@ worker_pool_ft(Funs) ->
   Nodes = nodes(),
   process_flag(trap_exit,true),
   Pids = [spawn_link(Node,map_reduce,work_ft,[self()]) || Node <- Nodes],
-  Workers = maps:new(),
-  Results = pool_ft(Funs,[],Workers,0),
+  Results = pool_ft(Funs,[],[],0),
   [Pid ! {die} || Pid <- Pids],
   [receive {available,_} -> ok end || _ <- Nodes],
   Results.
@@ -162,26 +161,26 @@ pool_ft([],Results,_,0) -> Results;
 pool_ft([],Results,Workers,Wait_For) ->
   receive
     {work_done,Result,Node} ->
-      New_Workers = maps:remove(Node,Workers),
+      {_,_,New_Workers} = lists:keytake(Node,1,Workers),
       pool_ft([],[Result|Results],New_Workers,Wait_For-1);
     {'EXIT',Pid,_} ->
-      Fun = maps:get(Pid,Workers),
-      New_Workers = maps:remove(Pid,Workers),
-      pool_ft([Fun],Results,New_Workers,Wait_For-1) 
+      {_,{_,Fun},New_Workers} = lists:keytake(Pid,1,Workers),
+      pool_ft([Fun],Results,New_Workers,Wait_For-1)
   end;
 
 pool_ft([Fun|Funs],Results,Workers,Wait_For) ->
   receive {available,Node} ->
             Node ! {work,Fun},
-            New_Workers = maps:put(Node,Fun,Workers),
+            New_Workers = [{Node,Fun}|Workers],
             pool_ft(Funs,Results,New_Workers,Wait_For+1);
           {work_done,Result,Node} ->
-            New_Workers = maps:remove(Node,Workers),
+            {_,_,New_Workers} = lists:keytake(Node,1,Workers),
             pool_ft([Fun|Funs],[Result|Results],New_Workers,Wait_For-1);
-          {'EXIT',Pid,_} ->
-            Fun2 = maps:get(Pid,Workers),
-            New_Workers = maps:remove(Pid,Workers),
-            pool_ft([Fun2|[Fun|Funs]],Results,New_Workers,Wait_For-1)
+          {'EXIT',Pid,_} -> case lists:keytake(Pid,1,Workers) of
+                              {_,{_,Fun2},New_Workers} ->
+                                pool_ft([Fun2|[Fun|Funs]],Results,New_Workers,Wait_For-1);
+                              false -> pool_ft([Fun|Funs],Results,Workers,Wait_For)
+                            end
   end.
 
 work_ft(Pool) ->
