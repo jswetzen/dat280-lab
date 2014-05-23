@@ -58,8 +58,8 @@ map_reduce_dist(Map,M,Reduce,R,Input) ->
   Mappeds =
   [receive {Pid,L} -> L end || Pid <-Mappers],
   Reducers =
-  lists:flatten([remote_reducer(Parent,Reduce,R,Mapped,Node)
-   || {Mapped, Node} <-lists:zip(Mappeds, Nodes)]),
+  lists:flatten([remote_reducer(Parent,Reduce,I,Mappeds,Nodes)
+   || I <-lists:seq(0,R-1)]),
   Reduceds =
   [receive {Pid,L} -> L end || Pid <-Reducers],
   lists:sort(lists:flatten(Reduceds)).
@@ -68,9 +68,16 @@ remote_mapper(Parent,M,Map,R,Split,Node) ->
   [rpc:call(Node,map_reduce,spawn_mapper,[Parent,Map,R,S])
    || S <- split_into(M,Split)].
 
-remote_reducer(Parent,Reduce,R,Mapped,Node) ->
-  [rpc:call(Node,map_reduce,spawn_reducer,[Parent,Reduce,I,Mapped])
-   || I <- lists:seq(0,R-1)].
+remote_reducer(Parent,Reduce,I,Mapped,Nodes) ->
+  Node_id = I rem length(Nodes),
+  Node = index_of(Node_id,Nodes),
+  rpc:call(Node,map_reduce,spawn_reducer,[Parent,Reduce,I,Mapped]).
+
+index_of(Item, List) -> index_of(Item, List, 0).
+
+index_of(_, [], _)  -> not_found;
+index_of(Item, [Item|_], Index) -> Index;
+index_of(Item, [_|Tl], Index) -> index_of(Item, Tl, Index+1).
 
 % end of distributed
 
