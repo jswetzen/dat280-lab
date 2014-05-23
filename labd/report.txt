@@ -1,0 +1,31 @@
+Report for Lab D in Parallel Functional Programming, Spring 2014
+
+Sebastian Lagerman - seblag@student.chalmers.se
+Johan Swetzén - swetzen@student.chalmer.se
+
+
+The tests we conducted on a single machine were preformed on a four core monster.
+We also tried over a network with a iPhone for a router and a five year old
+dual-core MacBok Pro as the second participating computer.
+
+The first tests on the single machine were performed with four virtual nodes
+and a master node.
+The other tests were preformed with 10 nodes, two of them on the MacBook.
+
+The file we were testing on had a size of roughly 8MB.
+
+Our measurements are all in the page_rank.erl file, along with each function.
+
+We had quite disappointing results for our distributed versions. The more work
+we put into writing each version, the worse it got. So our naive
+implementation was the best one in our tests. There are a few factors that we
+believe played a role in this.
+
+- We had too small a file to test on.
+- We probably sent too small chunks of data considering the file size.
+- Our network setup was far from ideal.
+- The two computers weren't equal in hardware. It's possible the MacBook took
+  a while to finish its work while the other computer had finished the rest.
+
+We thought the worker pool would perform better than it did, but the chunks of
+work were probably not big enough for it to make any difference.

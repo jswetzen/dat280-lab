@@ -16,6 +16,7 @@ reduce(Url,Ns) ->
   [{Url,lists:sum(Ns)}].
 
 %% 188 seconds
+%% Ours: 12.529 seconds
 page_rank() ->
   dets:open_file(web,[{file,"web.dat"}]),
   Urls = dets:foldl(fun({K,_},Keys)->[K|Keys] end,[],web),
@@ -23,6 +24,7 @@ page_rank() ->
                             [{Url,ok} || Url <-Urls]).
 
 %% 86 seconds
+%% Ours: 8.497 seconds
 page_rank_par() ->
   dets:open_file(web,[{file,"web.dat"}]),
   Urls = dets:foldl(fun({K,_},Keys)->[K|Keys] end,[],web),
@@ -30,6 +32,8 @@ page_rank_par() ->
                             [{Url,ok} || Url <-Urls]).
 
 %% Distributed
+%% 8.935 seconds
+%% 10.258 (10 virtual nodes with 2 over the network)
 page_rank_dist() ->
   dets:open_file(web,[{file,"web.dat"}]),
   Urls = dets:foldl(fun({K,_},Keys)->[K|Keys] end,[],web),
@@ -41,12 +45,16 @@ map_dist(Fun,Xs) ->
   map(Fun,Xs).
 
 %% Workers Pool
+%% 8.782 seconds
+%% 16.671 (10 virtual nodes with 2 over the network)
 page_rank_pool() ->
   dets:open_file(web,[{file,"web.dat"}]),
   Urls = dets:foldl(fun({K,_},Keys)->[K|Keys] end,[],web),
   map_reduce:map_reduce_pool(fun map_dist/2, 32, fun reduce/2, 32,
                             [{Url,ok} || Url <-Urls]).
 %% Fault-Tolerance
+%% 8.855 seconds
+%% 16.582 (10 virtual nodes with 2 over the network)
 page_rank_ft() ->
   dets:open_file(web,[{file,"web.dat"}]),
   Urls = dets:foldl(fun({K,_},Keys)->[K|Keys] end,[],web),
