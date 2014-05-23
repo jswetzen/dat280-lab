@@ -79,57 +79,80 @@ remote_reducer(Parent,Reduce,I,Mapped,Nodes) ->
 
 % Load-balancing Map-Reduce
 
-%map_reduce_pool(Map,Reduce,Input) ->
-%  Parent = self(),
-%  worker_pool([fun() -> 
-%                 Mapped = [{erlang:phash2(K2,R),{K2,V2}}
-%                           || {K,V} <-Split,
-%                              {K2,V2} <-Map(K,V)],
-%                 Parent !
-%                 {self(),group(lists:sort(Mapped))}
-%               end]).
+% map_reduce_pool(Map,Reduce,Input) ->
+%   Parent = self(),
+%   worker_pool([fun() ->
+%                  Mapped = [{erlang:phash2(K2,R),{K2,V2}}
+%                            || {K,V} <-Split,
+%                               {K2,V2} <-Map(K,V)],
+%                  Parent !
+%                  {self(),group(lists:sort(Mapped))}
+%                end]).
 
 worker_pool(Funs) ->
-  Pool = self(),
-  Nodes = [node()|nodes()],
-  [spawn_link(Node,work(Pool)) || Node <- Nodes],
-  [receive
-     {work_done,Result,Node} -> Node ! {work,Fun(),Pool},
-                                Result;
-     {first_time,Node} -> Node ! {work,Fun(),Pool}
-   end || Fun <- Funs].
+  Nodes = nodes(),
+  Pids = [spawn_link(Node,map_reduce,work,[self()]) || Node <- Nodes],
+  Results = pool(Funs,[],0),
+  [Pid ! {die} || Pid <- Pids],
+  [receive {available,_} -> ok end || _ <- Nodes],
+  Results.
+
+pool([],Results,0) -> Results;
+
+pool([],Results,Wait_For) ->
+  receive {work_done,Result} -> pool([],[Result|Results],Wait_For-1) end;
+
+pool([Fun|Funs],Results,Wait_For) ->
+  receive {available,Node} -> Node ! {work,Fun},
+                              pool(Funs,Results,Wait_For+1);
+          {work_done,Result} -> pool([Fun|Funs],[Result|Results],Wait_For-1)
+  end.
 
 work(Pool) ->
-  Node = self(),
-  Pool ! {first_time,Node},
-  loop(Node).
-  %receive
-  %  {work,Fun,Pool} -> Result = Fun(),
-  %                     Pool ! {work_done,Result,Node}
-  %end.
-
-loop(Node) ->
-  receive
-    {work,Fun,Pool} -> Result = Fun(),
-                       Pool ! {work_done,Result,Node},
-                       loop(Node)
+  Pool ! {available,self()},
+  receive {work,Fun} -> Result = Fun(),
+                        Pool ! {work_done,Result},
+                        work(Pool);
+          {die} -> ok
   end.
 
-pool() ->
-  Nodes = [node()|nodes()],
-  spawn_link(fun() -> pool(Nodes) end).
+% worker_pool(Funs) ->
+%   Pool = self(),
+%   Nodes = [node()|nodes()],
+%   [spawn_link(Node,work(Pool)) || Node <- Nodes],
+%   [receive
+%      {work_done,Result,Node} -> Node ! {work,Fun(),Pool},
+%                                 Result;
+%      {first_time,Node} -> Node ! {work,Fun(),Pool}
+%    end || Fun <- Funs].
 
-pool([]) ->
-  receive
-    {available,Node} ->
-      pool([Node])
-  end;
-pool([Node|Nodes]) ->
-  receive
-    {get_node,Pid} ->
-      Pid ! {use_node,Node},
-      pool(Nodes)
-  end.
+% work(Pool) ->
+%   Node = self(),
+%   Pool ! {first_time,Node},
+%   loop(Node).
+
+% loop(Node) ->
+%   receive
+%     {work,Fun,Pool} -> Result = Fun(),
+%                        Pool ! {work_done,Result,Node},
+%                        loop(Node)
+%   end.
+
+% pool() ->
+%   Nodes = [node()|nodes()],
+%   spawn_link(fun() -> pool(Nodes) end).
+
+% pool([]) ->
+%   receive
+%     {available,Node} ->
+%       pool([Node])
+%   end;
+% pool([Node|Nodes]) ->
+%   receive
+%     {get_node,Pid} ->
+%       Pid ! {use_node,Node},
+%       pool(Nodes)
+%   end.
 
 % end of Load-balancing Map-Reduce
 
