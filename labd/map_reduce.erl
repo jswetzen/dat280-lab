@@ -48,15 +48,17 @@ group(K,Vs,Rest) ->
 
 map_reduce_dist(Map,M,Reduce,R,Input) ->
   Parent = self(),
-  Nodes = nodes(),
-  Nodes_Len = length(Nodes),
-  Splits = split_into(Nodes_Len,Input),
+  Nodes = [node()|nodes()],
+  Splits = split_into(length(Nodes),Input),
   Split_Nodes = lists:zip(Splits, Nodes),
   Mappers =
+  %[remote_mapper(Parent,M,Map,R,Split,Node)
   lists:flatten([remote_mapper(Parent,M,Map,R,Split,Node)
    || {Split, Node} <-Split_Nodes]),
   Mappeds =
   [receive {Pid,L} -> L end || Pid <-Mappers],
+  %[[receive {Pid,L} -> L end || Pid <- Mapper]
+  % || Mapper <- Mappers],
   Reducers =
   lists:flatten([remote_reducer(Parent,Reduce,I,Mappeds,Nodes)
    || I <-lists:seq(0,R-1)]),
@@ -70,16 +72,66 @@ remote_mapper(Parent,M,Map,R,Split,Node) ->
 
 remote_reducer(Parent,Reduce,I,Mapped,Nodes) ->
   Node_id = I rem length(Nodes),
-  Node = index_of(Node_id,Nodes),
+  Node = lists:nth(Node_id+1,Nodes),
   rpc:call(Node,map_reduce,spawn_reducer,[Parent,Reduce,I,Mapped]).
 
-index_of(Item, List) -> index_of(Item, List, 0).
-
-index_of(_, [], _)  -> not_found;
-index_of(Item, [Item|_], Index) -> Index;
-index_of(Item, [_|Tl], Index) -> index_of(Item, Tl, Index+1).
-
 % end of distributed
+
+% Load-balancing Map-Reduce
+
+%map_reduce_pool(Map,Reduce,Input) ->
+%  Parent = self(),
+%  worker_pool([fun() -> 
+%                 Mapped = [{erlang:phash2(K2,R),{K2,V2}}
+%                           || {K,V} <-Split,
+%                              {K2,V2} <-Map(K,V)],
+%                 Parent !
+%                 {self(),group(lists:sort(Mapped))}
+%               end]).
+
+worker_pool(Funs) ->
+  Pool = self(),
+  Nodes = [node()|nodes()],
+  [spawn_link(Node,work(Pool)) || Node <- Nodes],
+  [receive
+     {work_done,Result,Node} -> Node ! {work,Fun(),Pool},
+                                Result;
+     {first_time,Node} -> Node ! {work,Fun(),Pool}
+   end || Fun <- Funs].
+
+work(Pool) ->
+  Node = self(),
+  Pool ! {first_time,Node},
+  loop(Node).
+  %receive
+  %  {work,Fun,Pool} -> Result = Fun(),
+  %                     Pool ! {work_done,Result,Node}
+  %end.
+
+loop(Node) ->
+  receive
+    {work,Fun,Pool} -> Result = Fun(),
+                       Pool ! {work_done,Result,Node},
+                       loop(Node)
+  end.
+
+pool() ->
+  Nodes = [node()|nodes()],
+  spawn_link(fun() -> pool(Nodes) end).
+
+pool([]) ->
+  receive
+    {available,Node} ->
+      pool([Node])
+  end;
+pool([Node|Nodes]) ->
+  receive
+    {get_node,Pid} ->
+      Pid ! {use_node,Node},
+      pool(Nodes)
+  end.
+
+% end of Load-balancing Map-Reduce
 
 map_reduce_par(Map,M,Reduce,R,Input) ->
   Parent = self(),
