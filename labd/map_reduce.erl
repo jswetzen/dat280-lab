@@ -125,6 +125,76 @@ work(Pool) ->
 
 % end of Load-balancing Map-Reduce
 
+% Fault-tolerant Map-Reduce
+
+map_reduce_ft(Map,M,Reduce,R,Input) ->
+  Splits = split_into(M,Input),
+  Mappeds = worker_pool_ft([fun() ->
+                             Mapped = [{erlang:phash2(K2,R),{K2,V2}}
+                                       || {K,V} <- Split,
+                                          {K2,V2} <-Map(K,V)],
+                             group(lists:sort(Mapped))
+                         end || Split <- Splits]),
+  Reducers = lists:flatten(
+               worker_pool_ft(
+                 [fun() ->
+                      In = [KV || Mapped <-Mappeds,
+                                  {J,KVs} <-Mapped,
+                                  I==J,
+                                  KV <-KVs],
+                      reduce_seq(Reduce,In)
+                  end || I <-lists:seq(0,R-1)]
+                )),
+  lists:sort(Reducers).
+
+worker_pool_ft(Funs) ->
+  Nodes = nodes(),
+  process_flag(trap_exit,true),
+  Pids = [spawn_link(Node,map_reduce,work_ft,[self()]) || Node <- Nodes],
+  Workers = maps:new(),
+  Results = pool_ft(Funs,[],Workers,0),
+  [Pid ! {die} || Pid <- Pids],
+  [receive {available,_} -> ok end || _ <- Nodes],
+  Results.
+
+pool_ft([],Results,_,0) -> Results;
+
+pool_ft([],Results,Workers,Wait_For) ->
+  receive
+    {work_done,Result,Node} ->
+      New_Workers = maps:remove(Node,Workers),
+      pool_ft([],[Result|Results],New_Workers,Wait_For-1);
+    {'EXIT',Pid,_} ->
+      Fun = maps:get(Pid,Workers),
+      New_Workers = maps:remove(Pid,Workers),
+      pool_ft([Fun],Results,New_Workers,Wait_For-1) 
+  end;
+
+pool_ft([Fun|Funs],Results,Workers,Wait_For) ->
+  receive {available,Node} ->
+            Node ! {work,Fun},
+            New_Workers = maps:put(Node,Fun,Workers),
+            pool_ft(Funs,Results,New_Workers,Wait_For+1);
+          {work_done,Result,Node} ->
+            New_Workers = maps:remove(Node,Workers),
+            pool_ft([Fun|Funs],[Result|Results],New_Workers,Wait_For-1);
+          {'EXIT',Pid,_} ->
+            Fun2 = maps:get(Pid,Workers),
+            New_Workers = maps:remove(Pid,Workers),
+            pool_ft([Fun2|[Fun|Funs]],Results,New_Workers,Wait_For-1)
+  end.
+
+work_ft(Pool) ->
+  Pool ! {available,self()},
+  receive {work,Fun} -> Result = Fun(),
+                        Pool ! {work_done,Result,self()},
+                        work_ft(Pool);
+          {die} -> ok
+  end.
+
+% End of FT MR
+
+
 map_reduce_par(Map,M,Reduce,R,Input) ->
   Parent = self(),
   Splits = split_into(M,Input),
